@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>本德 - 管理员后台</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        :root { --theme-color: #d63031; } /* 管理后台使用红色主题 */
+
+        body { 
+            margin: 0; 
+            background: #121217;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; 
+            height: 100vh; 
+            display: flex; 
+            overflow: hidden; 
+            color: #e0e0e0; 
+            user-select: none; 
+        }
+        
+        .sidebar { 
+            width: 200px;
+            background: #1a1a21;
+            border-right: 1px solid #2a2a31; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 10px 0; 
+            z-index: 1000; 
+            flex-shrink: 0; 
+        }
+        .sidebar-logo { 
+            padding: 20px; 
+            font-size: 20px; 
+            font-weight: bold; 
+            color: #fff; 
+            text-align: center;
+            border-bottom: 1px solid #2a2a31;
+            margin-bottom: 10px;
+        }
+        .nav-item { 
+            width: 100%;
+            padding: 15px 20px;
+            cursor: pointer; 
+            color: #a0a0b0; 
+            display: flex; 
+            align-items: center; 
+            gap: 15px;
+            transition: all 0.2s ease; 
+            border-left: 3px solid transparent; 
+            font-size: 14px;
+            font-weight: 500;
+            box-sizing: border-box;
+        }
+        .nav-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+        .nav-item.active { background: rgba(214, 48, 49, 0.2); color: var(--theme-color); border-left: 3px solid var(--theme-color); }
+        
+        .main-content { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            position: relative; 
+            overflow: hidden; 
+            min-width: 0;
+        }
+        .page { 
+            display: none; 
+            flex: 1; 
+            flex-direction: column; 
+            position: relative; 
+            padding: 25px; 
+            box-sizing: border-box; 
+            width: 100%; 
+            height: 100%; 
+            overflow-y: auto; 
+            background: #121217;
+        }
+        .page.active { display: flex; }
+        .page-title { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #fff; }
+
+        .btn { 
+            height: 36px !important; 
+            padding: 0 18px !important; 
+            font-size: 14px !important; 
+            border-radius: 8px; 
+            white-space: nowrap; 
+            font-weight: 600; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border: none; 
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.3); filter: brightness(1.1); }
+        .btn:active { transform: translateY(0); box-shadow: 0 2px 5px rgba(0,0,0,0.2); filter: brightness(0.95); }
+        
+        .btn-normal { background: #33333a; color: #e0e0e0; border: 1px solid #444; }
+        .btn-import { background: var(--theme-color); color: white; }
+
+        .form-input, .form-select { width: 100%; padding: 12px; background: #1f1f2e; border: 1px solid #333; color: #fff; border-radius: 8px; box-sizing: border-box; outline: none; transition: all 0.2s ease; }
+        .form-input:focus, .form-select:focus { border-color: var(--theme-color); box-shadow: 0 0 0 3px rgba(214, 48, 49, 0.3); }
+        .form-group { display: flex; flex-direction: column; gap: 8px; }
+        .form-group label { font-size: 13px; color: #a0a0b0; }
+
+        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(18, 18, 23, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 200000; display: flex; align-items: center; justify-content: center; }
+        .login-card { width: 400px; background: #1a1a21; padding: 40px; border-radius: 15px; box-shadow: 0 15px 40px rgba(0,0,0,0.5); text-align: center; border: 1px solid #333; }
+        .login-title { font-size: 24px; font-weight: bold; margin-bottom: 30px; color: #fff; }
+        .login-input { width: 100%; padding: 14px; margin-bottom: 15px; background: #121217; border: 1px solid #333; color: #fff; border-radius: 8px; box-sizing: border-box; outline: none; transition: all 0.2s ease; font-size: 14px; }
+        .login-input:focus { border-color: var(--theme-color); box-shadow: 0 0 0 4px rgba(214, 48, 49, 0.3); }
+        
+        .settings-layout { display: flex; height: 100%; gap: 20px; overflow: hidden; }
+        .settings-menu { width: 160px; min-width: 160px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid #2a2a31; padding-right: 20px; overflow-y: auto; }
+        .settings-tab-btn { padding: 12px 15px; border-radius: 8px; color: #b2bec3; cursor: pointer; transition: all 0.2s ease; font-size: 13px; display: flex; align-items: center; gap: 8px; background: transparent; border: none; text-align: left; width: 100%; }
+        .settings-tab-btn:hover { background: #2d2d30; color: #fff; }
+        .settings-tab-btn.active { background: var(--theme-color); color: white; font-weight: bold; box-shadow: 0 4px 10px rgba(214, 48, 49, 0.2); }
+        .settings-content-area { flex: 1; overflow-y: auto; padding-right: 10px; min-width: 0; height: 100%; }
+        .setting-panel { display: none; }
+        .setting-panel.active { display: block; }
+        
+        .action-btn { padding: 4px 10px; border-radius: 3px; border: none; cursor: pointer; font-size: 11px; margin-right: 5px; color: white; transition: filter 0.2s; }
+        .action-btn:hover { filter: brightness(1.2); }
+
+        .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .admin-table th, .admin-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #2a2a31; }
+        .admin-table th { color: #888; font-size: 12px; text-transform: uppercase; }
+        .admin-table tr:hover { background: #1f1f2e; }
+        .status-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+        .status-ok { background: rgba(0, 184, 148, 0.2); color: #00b894; }
+        .status-ban { background: rgba(214, 48, 49, 0.2); color: #d63031; }
+        .login-btn { width: 100%; padding: 14px; background: var(--theme-color); color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: all 0.2s ease; }
+        .login-btn:hover { filter: brightness(1.1); box-shadow: 0 5px 15px rgba(214, 48, 49, 0.3); }
+        .login-links { margin-top: 20px; display: flex; justify-content: space-between; font-size: 12px; color: #888; }
+        .link-btn { cursor: pointer; transition: 0.2s; }
+        .link-btn:hover { color: var(--theme-color); }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay" class="login-overlay" style="display: none;">
+        <div class="login-card">
+            <div class="login-title">管理员登录</div>
+            <input type="text" id="login-user" class="login-input" placeholder="管理员账户">
+            <input type="password" id="login-pass" class="login-input" placeholder="密码">
+            <button class="login-btn" onclick="handleLogin()">登 录</button>
+            <div class="login-links">
+                <span></span>
+                <span class="link-btn" onclick="showCustomAlert('请联系超级管理员重置密码')">忘记密码?</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-prompt" class="login-overlay" style="display: none; z-index: 300000;">
+        <div class="login-card" style="width: 350px; padding: 30px;">
+            <div id="prompt-msg" class="login-title" style="font-size: 18px; margin-bottom: 20px;">请输入内容</div>
+            <input type="text" id="prompt-input" class="login-input" autocomplete="off">
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button id="prompt-cancel" class="btn btn-normal" style="flex: 1;">取消</button>
+                <button id="prompt-confirm" class="btn btn-import" style="flex: 1;">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="publish-overlay" class="login-overlay" style="display: none; z-index: 300001;">
+        <div class="login-card" style="width: 450px; text-align: left; padding: 30px;">
+            <div class="login-title" style="margin-bottom: 20px; font-size: 20px;">发布新版本</div>
+            <label style="color:#b2bec3; font-size:12px; margin-bottom: 5px; display: block;">版本号 (如 1.7)</label>
+            <input type="text" id="pub-ver" class="login-input" placeholder="请输入版本号">
+            <label style="color:#fdcb6e; font-size:12px; margin-bottom: 5px; display: block;">EXE 直链 (必须是点击即下载的链接)</label>
+            <input type="text" id="pub-url" class="login-input" placeholder="http://xxx.com/本德.exe">
+            <label style="color:#b2bec3; font-size:12px; margin-bottom: 5px; display: block;">更新说明</label>
+            <textarea id="pub-note" class="login-input" style="height: 100px; resize: none; font-family: sans-serif;" placeholder="请输入更新内容..."></textarea>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn btn-normal" style="flex: 1;" onclick="closePublishDialog()">取消</button>
+                <button class="btn btn-import" style="flex: 1;" onclick="handlePublishUpdate()">确认发布</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="image-preview-overlay" class="login-overlay" 
+         style="display: none; z-index: 400000; background: rgba(0,0,0,0.9); pointer-events: none;" 
+         onclick="closeImagePreview()">
+        <img id="preview-large-img" src="" 
+             style="max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: zoom-out; pointer-events: auto; -webkit-user-select: none; -webkit-user-drag: none;" 
+             onclick="closeImagePreview()">
+        <div style="position: absolute; bottom: 30px; color: #fff; font-size: 14px; background: rgba(0,0,0,0.5); padding: 8px 15px; border-radius: 20px; pointer-events: auto;">
+            点击任意处关闭 | 右键图片可复制
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="sidebar-logo">管理员后台</div>
+        <div class="nav-item active" onclick="switchAdminTab('admin-tab-users', this)">
+            <span class="material-icons">people</span> 用户管理
+        </div>
+        <!-- ============================================================ -->
+<!-- 🚀 公告管理模块 -->
+<!-- ============================================================ -->
+<div style="margin-top: 40px; background: #1f1f2e; padding: 25px; border-radius: 12px; border: 1px solid #333;">
+    <h2 style="margin-top: 0; color: var(--theme-color);">公告管理</h2>
+    <p style="font-size: 13px; color: #888; margin-bottom: 15px;">在这里编辑的内容将作为公告，在所有用户登录后自动弹出。</p>
+    <textarea id="admin-announcement-text" style="width: 100%; height: 200px; background: #14141e; border: 1px solid #444; color: #fff; border-radius: 8px; padding: 15px; font-size: 14px; resize: vertical; box-sizing: border-box;"></textarea>
+    <button class="btn" onclick="saveAnnouncement()" style="background: #00b894; color: white; margin-top: 15px; height: 45px; width: 180px;">发布/更新公告</button>
+</div>
+        <div class="nav-item" onclick="switchAdminTab('admin-tab-payment', this)">
+            <span class="material-icons">payments</span> 收款设置
+        </div>
+        <div class="nav-item" style="margin-top: auto;" onclick="logout()">
+            <span class="material-icons">logout</span> 退出登录
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div id="page-admin" class="page active">
+            <div class="page-title">管理员控制台</div>
+            <div class="settings-content-area" style="padding:0; height: 100%;">
+                <div id="admin-tab-users" class="setting-panel active">
+                    <div id="admin-publish-section" style="background: #14141e; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #252526;">
+                        <div>
+                            <span style="font-size: 14px; font-weight: bold; color: #fff;">版本发布</span>
+                            <span style="font-size: 12px; color: #888; display: block;">发布新版本后，所有客户端将收到更新提示</span>
+                        </div>
+                        <button class="btn btn-import" style="background: #0984e3;" onclick="showPublishDialog()">发布新版本</button>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" id="admin-search" class="form-input" placeholder="搜索用户..." style="width: 200px;">
+                        <button class="btn btn-normal" onclick="loadAdminData()">刷新列表</button>
+                    </div>
+                    <div style="overflow-y: auto; flex: 1;">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用户名</th>
+                                    <th>设备指纹 (HWID)</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-user-list"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="admin-tab-payment" class="setting-panel">
+                    <div style="background: #14141e; padding: 25px; border-radius: 12px; border: 1px solid #333;">
+                        <h3 style="color: #00b894; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 15px;">加密货币收款 (USDT-TRC20)</h3>
+                        <div id="pay-edit-tip" style="font-size: 12px; color: #fdcb6e; margin-bottom: 20px; display: none;">
+                            <span class="material-icons" style="font-size: 14px; vertical-align: middle;">lock</span> 
+                            超级管理员模式：您可以编辑以下信息，保存后对所有用户生效。
+                        </div>
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label style="color: #26a17b;">收款二维码</label>
+                            <input type="text" id="pay-qr-input" class="form-input" placeholder="请输入二维码图片直链 URL" style="width: 100%; margin-bottom: 10px; display: none;">
+                            <div style="margin-top: 5px;">
+                                <img id="img-pay-qr" src="" style="max-width: 200px; border-radius: 8px; border: 1px solid #555; display: none; cursor: zoom-in;" onerror="this.style.display='none'" onclick="showImagePreview(this.src)" title="点击查看大图">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label style="color: #26a17b;">收款地址 (TRC20)</label>
+                            <input type="text" id="pay-addr-input" class="form-input" placeholder="Txxxxxxxx..." style="width: 100%; margin-bottom: 10px; font-family: monospace; display: none;">
+                            <div id="pay-addr-display" style="background: #0b0b10; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 16px; color: #fff; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;">
+                                <span id="text-pay-addr" style="word-break: break-all;">--</span>
+                                <button class="btn btn-normal" onclick="navigator.clipboard.writeText(document.getElementById('text-pay-addr').innerText); showCustomAlert('已复制')">复制</button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label>公告 / 备注</label>
+                            <textarea id="pay-note-input" class="form-input" style="width: 100%; height: 80px; resize: none; display: none; margin-bottom: 10px;" placeholder="备注信息..."></textarea>
+                            <div id="pay-note-display" style="color: #b2bec3; font-size: 14px; line-height: 1.5; white-space: pre-wrap; background: #0b0b10; padding: 10px; border-radius: 8px; min-height: 20px;"></div>
+                        </div>
+                        <div style="text-align: right; border-top: 1px solid #333; padding-top: 20px;">
+                            <button id="btn-save-pay" class="btn btn-import" onclick="savePaymentInfo()" style="display: none;">保存并发布</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 🚀 新增：Supabase 客户端初始化 (admin.html 专用)
+        // ============================================================
+        const SB_URL = "https://izyizmnwfyrupapzcsti.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6eWl6bW53ZnlydXBhcHpjc3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1OTc0MDAsImV4cCI6MjA4MTE3MzQwMH0.S3en_enCy9gqzXwQxkDRvK1LKPVgsFZITdTpsDvpKZQ";
+        window.sbClient = null;
+    
+        try {
+            // "supabase" 这个全局变量是由上面引入的库创建的
+            window.sbClient = supabase.createClient(SB_URL, SB_KEY);
+            console.log("[Admin] Supabase 客户端初始化成功。");
+        } catch (e) {
+            console.error("[Admin] Supabase 客户端初始化失败:", e);
+            alert("数据库连接失败，请检查网络并刷新页面。");
+        }
+        let sbClient = null;
+        let currentUser = null;
+        let notifiedCache = new Set();
+
+        // 🚀 修复：使用更稳健的 Supabase 初始化逻辑，防止因网络延迟导致加载失败
+        function initSupabaseAndStart() {
+            // 只有在 supabase 库存在且客户端未初始化时才执行
+            if (window.supabase && !sbClient) {
+                try {
+                    sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+                    console.log("[Admin] Supabase 客户端初始化成功");
+                    // 初始化成功后，立即执行后续的管理员验证逻辑
+                    startAdminPanel();
+                } catch (e) {
+                    alert("Supabase 初始化失败，请刷新页面。");
+                }
+            }
+        }
+
+        // 启动后台面板的核心逻辑
+        function startAdminPanel() {
+            // 验证管理员身份
+            const userData = localStorage.getItem('adminUser');
+            if (userData) {
+                currentUser = JSON.parse(userData);
+                if (currentUser.is_admin) {
+                    document.getElementById('login-overlay').style.display = 'none';
+                    loadAdminData();
+                    initAdminRealtimeListener();
+                    return;
+                }
+            }
+            // 未登录或非管理员，显示登录框
+            document.getElementById('login-overlay').style.display = 'flex';
+        }
+
+        // 页面加载时启动初始化
+        window.onload = () => {
+            initSupabaseAndStart();
+            // 如果 supabase 库还没加载完，设置一个重试机制，最多等待5秒
+            if (!sbClient) {
+                let retries = 0;
+                const interval = setInterval(() => {
+                    if (window.supabase || retries > 50) { // 50 * 100ms = 5 seconds
+                        clearInterval(interval);
+                        initSupabaseAndStart(); // 再次尝试初始化
+                    }
+                    retries++;
+                }, 100);
+            }
+        };
+
+        async function handleLogin() {
+            const user = document.getElementById('login-user').value.trim();
+            const pass = document.getElementById('login-pass').value.trim();
+            if (!user || !pass) return await showCustomAlert("请输入用户名和密码");
+
+            try {
+                const { data, error } = await sbClient.from('users').select('*').eq('username', user).single();
+                if (error || !data) return await showCustomAlert("用户名或密码错误");
+
+                const match = dcodeIO.bcrypt.compareSync(pass, data.password_hash);
+                if (!match) return await showCustomAlert("用户名或密码错误");
+
+                if (!data.is_admin) {
+                    return await showCustomAlert("非管理员账户，禁止登录");
+                }
+
+                currentUser = data;
+                localStorage.setItem('adminUser', JSON.stringify(currentUser));
+                
+                document.getElementById('login-overlay').style.display = 'none';
+                loadAdminData();
+                initAdminRealtimeListener();
+
+            } catch (e) {
+                console.error(e);
+                showCustomAlert("登录出错: " + e.message);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('adminUser');
+            alert("已退出登录。");
+            window.close();
+        }
+
+        // 🛠️ 万能自定义弹窗工具
+        function showDialog(type, message, defaultValue = "") {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('custom-prompt');
+                const msgEl = document.getElementById('prompt-msg');
+                const inputEl = document.getElementById('prompt-input');
+                const btnOk = document.getElementById('prompt-confirm');
+                const btnCancel = document.getElementById('prompt-cancel');
+
+                overlay.style.display = 'flex';
+                msgEl.innerText = message;
+                inputEl.value = defaultValue;
+                
+                if (type === 'alert') {
+                    inputEl.style.display = 'none';
+                    btnCancel.style.display = 'none'; 
+                    btnOk.innerText = "确定";
+                    setTimeout(() => btnOk.focus(), 50); 
+                } else if (type === 'confirm') {
+                    inputEl.style.display = 'none';
+                    btnCancel.style.display = 'block';
+                    btnOk.innerText = "确定";
+                    setTimeout(() => btnOk.focus(), 50);
+                } else { // prompt
+                    inputEl.style.display = 'block';
+                    btnCancel.style.display = 'block';
+                    btnOk.innerText = "确定";
+                    setTimeout(() => { inputEl.focus(); inputEl.select(); }, 100);
+                }
+
+                const cleanup = () => {
+                    overlay.style.display = 'none';
+                    btnOk.onclick = null;
+                    btnCancel.onclick = null;
+                    inputEl.onkeydown = null;
+                };
+
+                btnOk.onclick = () => {
+                    cleanup();
+                    resolve(type === 'prompt' ? inputEl.value : true);
+                };
+
+                btnCancel.onclick = () => {
+                    cleanup();
+                    resolve(type === 'prompt' ? null : false);
+                };
+
+                inputEl.onkeydown = (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); btnOk.click(); }
+                    if (e.key === 'Escape') btnCancel.click();
+                };
+            });
+        }
+        window.showCustomPrompt = (msg, val) => showDialog('prompt', msg, val);
+        window.showCustomAlert = (msg) => showDialog('alert', msg);
+        window.showCustomConfirm = (msg) => showDialog('confirm', msg);
+
+        // 新增：格式化日期
+        function formatDate(isoDate) {
+            if (!isoDate) return '<span style="color:#888;">未设置</span>';
+            try {
+                const date = new Date(isoDate);
+                // 修正时区问题，确保显示的是数据库里的日期
+                const year = date.getUTCFullYear();
+                const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+                const day = date.getUTCDate().toString().padStart(2, '0');
+                return `${year}年${month}月${day}日`;
+            } catch (e) {
+                return '<span style="color:#d63031;">无效日期</span>';
+            }
+        }
+
+        // 新增：修改用户到期时间
+        async function editUserExpiry(uid, currentExpiry, targetRole) {
+            if (currentUser.role !== 'super') return showCustomAlert("权限不足：只有超级管理员可以修改时间");
+            
+            const defaultDate = currentExpiry ? currentExpiry.split('T')[0] : '';
+            const newDateStr = await showCustomPrompt("请输入新的到期日期 (格式 YYYY-MM-DD)\n留空则为永久有效。", defaultDate);
+
+            if (newDateStr === null) return; // 用户取消
+
+            let finalDate = null;
+            if (newDateStr) {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(newDateStr)) {
+                    return showCustomAlert("日期格式错误，请输入 YYYY-MM-DD");
+                }
+                finalDate = newDateStr;
+            }
+
+            const { error } = await sbClient.from('users').update({ expiry_date: finalDate }).eq('id', uid);
+            if (error) {
+                showCustomAlert("修改失败: " + error.message);
+            } else {
+                showCustomAlert("到期时间已更新！");
+                loadAdminData();
+            }
+        }
+
+        async function loadAdminData() {
+            if (!currentUser || !currentUser.is_admin) return;
+
+            const pubSection = document.getElementById('admin-publish-section');
+            if (pubSection) {
+                pubSection.style.display = (currentUser.role === 'super') ? 'flex' : 'none';
+            }
+            
+            const tbody = document.getElementById('admin-user-list');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">加载中...</td></tr>';
+
+            const search = document.getElementById('admin-search').value.trim();
+            let query = sbClient.from('users').select('id, username, hwid, is_approved, role, remark, request_mode, last_heartbeat, expiry_date').order('id');
+            if (search) query = query.or(`username.ilike.%${search}%,remark.ilike.%${search}%`);
+
+            const { data, error } = await query;
+            if (error) return alert("加载失败");
+
+            tbody.innerHTML = '';
+            data.forEach(u => {
+                const tr = document.createElement('tr');
+                const amISuper = currentUser.role === 'super';
+                const isTargetSuper = u.role === 'super';
+                const hasPermission = amISuper || !isTargetSuper;
+
+                tr.innerHTML = `
+                    <td>${u.id}</td>
+                    <td>
+                        <div style="display:flex; flex-direction: column; gap: 2px;">
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <span style="font-weight: bold;">${u.username}${isTargetSuper ? ' <span style="color:#f1c40f; font-size:10px;">(SUPER)</span>' : ''}</span>
+                                <span style="color:#888; font-size:11px;">${u.remark ? `(${u.remark})` : ''}</span>
+                                ${u.request_mode && amISuper ? `<span class="req-badge" data-uid="${u.id}" data-uname="${u.username}" data-mode="${u.request_mode}">🔔 请求: ${u.request_mode === 'mullvad' ? '模式一' : '模式二'}</span>` : ''}
+                                <button class="edit-remark-btn" data-uid="${u.id}" data-remark="${u.remark || ''}" data-role="${u.role}" style="background:transparent; color:#6c5ce7; font-size:16px; padding:0 5px; cursor:pointer; border:none;">✎</button>
+                            </div>
+                            <div style="font-size: 11px; color: #fdcb6e;">
+                                到期时间: ${formatDate(u.expiry_date)}
+                            </div>
+                        </div>
+                    </td>
+                    <td title="${u.hwid || ''}">${(u.hwid || '').substring(0, 10)}...</td>
+                    <td><span class="status-badge ${u.is_approved ? 'status-ok' : 'status-ban'}">${u.is_approved ? '正常' : '封禁/待审'}</span></td>
+                    <td>
+                        <button class="action-btn edit-expiry-btn" style="background: #e67e22;" data-uid="${u.id}" data-expiry="${u.expiry_date || ''}" data-role="${u.role}">改时间</button>
+                        <button class="action-btn toggle-status-btn ${u.is_approved ? 'status-ban' : 'status-ok'}" data-uid="${u.id}" data-status="${u.is_approved}" data-role="${u.role}">${u.is_approved ? '封禁' : '批准'}</button>
+                        <button class="action-btn reset-pass-btn" style="background: #0984e3;" data-uid="${u.id}" data-uname="${u.username}" data-role="${u.role}">重置</button>
+                        <button class="action-btn delete-user-btn" style="background: #d63031;" data-uid="${u.id}" data-uname="${u.username}" data-role="${u.role}">删除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 绑定事件
+            tbody.querySelectorAll('.edit-remark-btn').forEach(btn => btn.onclick = (e) => editUserRemark(e.currentTarget.dataset.uid, e.currentTarget.dataset.remark, e.currentTarget.dataset.role));
+            tbody.querySelectorAll('.toggle-status-btn').forEach(btn => btn.onclick = (e) => toggleUserStatus(e.currentTarget.dataset.uid, e.currentTarget.dataset.status === 'true', e.currentTarget.dataset.role));
+            tbody.querySelectorAll('.reset-pass-btn').forEach(btn => btn.onclick = (e) => resetUserPass(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.role));
+            tbody.querySelectorAll('.delete-user-btn').forEach(btn => btn.onclick = (e) => deleteUser(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.role));
+            tbody.querySelectorAll('.req-badge').forEach(badge => badge.onclick = (e) => handleGrantKey(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.mode));
+            tbody.querySelectorAll('.edit-expiry-btn').forEach(btn => btn.onclick = (e) => editUserExpiry(e.currentTarget.dataset.uid, e.currentTarget.dataset.expiry, e.currentTarget.dataset.role));
+        }
+        window.loadAdminData = loadAdminData;
+
+        function checkPermission(targetRole) {
+            if (currentUser.role === 'super') return true;
+            if (targetRole === 'super') return false;
+            return true;
+        }
+
+        async function editUserRemark(uid, currentRemark, targetRole) {
+            if (!checkPermission(targetRole)) return showCustomAlert("权限不足：无法操作超级管理员！");
+            const newRemark = await showCustomPrompt("请输入新备注 (留空则删除备注):", currentRemark || "");
+            if (newRemark === null) return;
+            const { error } = await sbClient.from('users').update({ remark: newRemark }).eq('id', uid);
+            if (error) showCustomAlert("备注修改失败: " + error.message);
+            else loadAdminData();
+        }
+
+        async function toggleUserStatus(uid, currentStatus, targetRole) {
+            if (!checkPermission(targetRole)) return showCustomAlert("权限不足：无法操作超级管理员！");
+            if (!await showCustomConfirm(`确定要${currentStatus ? '封禁' : '批准'}该用户吗？`)) return;
+            await sbClient.from('users').update({ is_approved: !currentStatus }).eq('id', uid);
+            loadAdminData();
+        }
+
+        async function deleteUser(uid, name, targetRole) {
+            if (currentUser.role !== 'super') return showCustomAlert("权限不足：只有超级管理员可以删除账户！");
+            if (!await showCustomConfirm(`危险操作\n确定要永久删除用户 [${name}] 吗？`)) return;
+            const { error } = await sbClient.from('users').delete().eq('id', uid);
+            if (error) showCustomAlert("删除失败: " + error.message);
+            else { showCustomAlert(`用户 [${name}] 已删除`); loadAdminData(); }
+        }
+
+        async function resetUserPass(uid, name, targetRole) {
+            if (!checkPermission(targetRole)) return showCustomAlert("权限不足：无法操作超级管理员！");
+            const newPass = await showCustomPrompt(`请输入用户 [${name}] 的新密码:`);
+            if (newPass === null || newPass.length < 6) return showCustomAlert("密码长度至少6位");
+            const salt = dcodeIO.bcrypt.genSaltSync(10);
+            const hash = dcodeIO.bcrypt.hashSync(newPass, salt);
+            const { error } = await sbClient.from('users').update({ password_hash: hash }).eq('id', uid);
+            if (error) showCustomAlert("重置失败: " + error.message);
+            else showCustomAlert(`用户 [${name}] 密码已重置成功！`);
+        }
+
+        async function handleGrantKey(uid, username, mode) {
+            if (currentUser.role !== 'super') return showCustomAlert("权限不足：只有超级管理员可以分配密钥");
+
+            let configData = {};
+            let modeName = '';
+            if (mode === 'mullvad') modeName = '模式一';
+            else if (mode === 'proton') modeName = '模式二';
+            else if (mode === 'webshare') modeName = '模式三';
+
+            if (mode === 'webshare') {
+                const newUrl = await showCustomPrompt(`正在为用户 [${username}] 分配 ${modeName}。\n\n请输入 Webshare 下载链接:`);
+                if (!newUrl) return;
+                configData = { url: newUrl, updated_at: new Date().toISOString() };
+            } else {
+                const newKey = await showCustomPrompt(`正在为用户 [${username}] 分配 ${modeName}。\n\n请输入 PrivateKey (密钥):`);
+                if (!newKey) return;
+                const newIp = await showCustomPrompt(`请输入对应的 IP 地址 (例如 10.2.0.2/32):`);
+                if (!newIp) return;
+                configData = { key: newKey, ip: newIp, psk: null, updated_at: new Date().toISOString() };
+            }
+
+            try {
+                const { data: userData } = await sbClient.from('users').select('assigned_config').eq('id', uid).single();
+                let currentConfig = userData.assigned_config || {};
+                currentConfig[mode] = configData;
+                const { error } = await sbClient.from('users').update({ 
+                    assigned_config: currentConfig,
+                    request_mode: null 
+                }).eq('id', uid);
+                if (error) throw error;
+                showCustomAlert(`✅ 已成功分配给 [${username}]！\n用户点击同步即可生效。`);
+                loadAdminData(); 
+            } catch (e) {
+                showCustomAlert("分配失败: " + e.message);
+            }
+        }
+// ============================================================
+// 🚀 公告管理 JS
+// ============================================================
+
+// 1. 加载当前公告内容到文本框
+async function loadAnnouncementContent() {
+    if (!window.sbClient) return;
+    try {
+        const { data, error } = await window.sbClient
+            .from('app_config')
+            .select('announcement')
+            .eq('id', 1)
+            .single();
+        
+        if (error) throw error;
+
+        if (data && data.announcement) {
+            document.getElementById('admin-announcement-text').value = data.announcement;
+        }
+    } catch (e) {
+        alert("加载公告失败: " + e.message);
+    }
+}
+
+// 2. 保存新的公告内容
+async function saveAnnouncement() {
+    if (!currentUser || currentUser.role !== 'super') {
+        return alert("权限不足，只有超级管理员可以发布公告！");
+    }
+
+    const newContent = document.getElementById('admin-announcement-text').value;
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerText = '发布中...';
+
+    try {
+        const { error } = await window.sbClient
+            .from('app_config')
+            .update({ announcement: newContent }) // 核心修改：移除了 updated_at 字段
+            .eq('id', 1);
+
+        if (error) throw error;
+
+        alert("公告发布成功！");
+    } catch (e) {
+        alert("发布失败: " + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = '发布/更新公告';
+    }
+}
+
+        // ================= 🚀 发布与收款 =================
+        function showPublishDialog() { document.getElementById('publish-overlay').style.display = 'flex'; }
+        function closePublishDialog() { document.getElementById('publish-overlay').style.display = 'none'; }
+        async function handlePublishUpdate() {
+            if (currentUser.role !== 'super') return showCustomAlert("权限不足");
+            const ver = document.getElementById('pub-ver').value.trim();
+            const url = document.getElementById('pub-url').value.trim();
+            const note = document.getElementById('pub-note').value.trim();
+            if (!ver || !url || !note) return showCustomAlert("请填写完整信息！");
+            if (!await showCustomConfirm(`确定要发布版本 v${ver} 吗？`)) return;
+            const { error } = await sbClient.from('app_config').update({ version: ver, download_url: url, update_note: note }).eq('id', 1);
+            if (error) showCustomAlert("发布失败: " + error.message);
+            else { showCustomAlert("新版本发布成功！"); closePublishDialog(); }
+        }
+
+        function switchAdminTab(tabId, btnElement) {
+            document.querySelectorAll('.setting-panel').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId.replace('page-admin #', '')).classList.add('active');
+            btnElement.classList.add('active');
+            if (tabId.includes('payment')) loadPaymentInfo();
+        }
+
+        async function loadPaymentInfo() {
+            const editElements = ['pay-qr-input', 'pay-addr-input', 'pay-note-input', 'btn-save-pay', 'pay-edit-tip'];
+            editElements.forEach(id => document.getElementById(id).style.display = 'none');
+            const { data, error } = await sbClient.from('app_config').select('*').eq('id', 1).single();
+            if (error) return;
+            document.getElementById('pay-qr-input').value = data.pay_wechat_url || '';
+            document.getElementById('pay-addr-input').value = data.pay_usdt_addr || '';
+            document.getElementById('pay-note-input').value = data.pay_note || '';
+            updateImgPreview('img-pay-qr', data.pay_wechat_url);
+            document.getElementById('text-pay-addr').innerText = data.pay_usdt_addr || '暂无地址';
+            document.getElementById('pay-note-display').innerText = data.pay_note || '暂无公告';
+            if (currentUser.role === 'super') {
+                editElements.forEach(id => document.getElementById(id).style.display = (id === 'btn-save-pay') ? 'inline-block' : 'block');
+            }
+        }
+
+        function updateImgPreview(imgId, url) {
+            const img = document.getElementById(imgId);
+            img.style.display = (url && url.startsWith('http')) ? 'block' : 'none';
+            if (img.style.display === 'block') img.src = url;
+        }
+
+        async function savePaymentInfo() {
+            if (currentUser.role !== 'super') return showCustomAlert("权限不足");
+            const qrUrl = document.getElementById('pay-qr-input').value.trim();
+            const addr = document.getElementById('pay-addr-input').value.trim();
+            const note = document.getElementById('pay-note-input').value.trim();
+            const { error } = await sbClient.from('app_config').update({ pay_wechat_url: qrUrl, pay_usdt_addr: addr, pay_note: note }).eq('id', 1);
+            if (error) showCustomAlert("保存失败: " + error.message);
+            else { showCustomAlert("✅ 收款信息已更新！"); loadPaymentInfo(); }
+        }
+
+        function showImagePreview(src) {
+            if (!src) return;
+            document.getElementById('preview-large-img').src = src;
+            document.getElementById('image-preview-overlay').style.display = 'flex';
+        }
+        function closeImagePreview() { document.getElementById('image-preview-overlay').style.display = 'none'; }
+
+        // ================= 🚀 实时监听 =================
+        function initAdminRealtimeListener() {
+            if (!currentUser || currentUser.role !== 'super') return;
+            console.log("[System] 管理员监听服务已启动...");
+            sbClient.channel('admin-global-alerts').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'request_mode=neq.null' }, (payload) => {
+                const newData = payload.new;
+                if (newData.request_mode) {
+                    const uniqueKey = `${newData.id}_${newData.request_mode}`;
+                    if (notifiedCache.has(uniqueKey)) return;
+                    notifiedCache.add(uniqueKey);
+
+                    // 智能通知系统：判断环境
+                    const title = '本德后台通知';
+                    const body = `用户 [${newData.username}] 请求刷新服务器，请及时处理！`;
+
+                    // 1. 如果在 Electron 软件环境中
+                    if (window.electronAPI && typeof window.electronAPI.showSysNotification === 'function') {
+                        window.electronAPI.showSysNotification(title, body);
+                    } 
+                    // 2. 如果在普通浏览器环境中
+                    else if ('Notification' in window) {
+                        if (Notification.permission === 'granted') {
+                            new Notification(title, { body: body });
+                        } else if (Notification.permission !== 'denied') {
+                            Notification.requestPermission().then(permission => {
+                                if (permission === 'granted') {
+                                    new Notification(title, { body: body });
+                                }
+                            });
+                        }
+                    }
+
+                    if (document.getElementById('page-admin').classList.contains('active')) loadAdminData();
+                }
+            }).subscribe((status) => console.log("📡 管理员通道订阅状态:", status));
+        }
+    </script>
+</body>
+</html>
