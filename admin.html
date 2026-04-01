@@ -396,7 +396,7 @@
                     <td>
                         <button class="action-btn toggle-status-btn ${u.is_approved ? 'status-ban' : 'status-ok'}" data-uid="${u.id}" data-status="${u.is_approved}" data-role="${u.role}">${u.is_approved ? '封禁' : '批准'}</button>
                         <button class="action-btn reset-pass-btn" style="background: #0984e3;" data-uid="${u.id}" data-uname="${u.username}" data-role="${u.role}">重置</button>
-                        <button class="action-btn delete-user-btn" style="background: #d63031;" data-uid="${u.id}" data-uname="${u.username}" data-role="${u.role}">删除</button>
+
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -405,7 +405,6 @@
             // 绑定事件
             tbody.querySelectorAll('.toggle-status-btn').forEach(btn => btn.onclick = (e) => toggleUserStatus(e.currentTarget.dataset.uid, e.currentTarget.dataset.status === 'true', e.currentTarget.dataset.role));
             tbody.querySelectorAll('.reset-pass-btn').forEach(btn => btn.onclick = (e) => resetUserPass(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.role));
-            tbody.querySelectorAll('.delete-user-btn').forEach(btn => btn.onclick = (e) => deleteUser(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.role));
         }
         window.loadAdminData = loadAdminData;
 
@@ -420,14 +419,6 @@
             if (!await showCustomConfirm(`确定要${currentStatus ? '封禁' : '批准'}该用户吗？`)) return;
             await sbClient.from('users').update({ is_approved: !currentStatus }).eq('id', uid);
             loadAdminData();
-        }
-
-        async function deleteUser(uid, name, targetRole) {
-            if (currentUser.role !== 'super') return showCustomAlert("权限不足：只有超级管理员可以删除账户！");
-            if (!await showCustomConfirm(`危险操作\n确定要永久删除用户 [${name}] 吗？`)) return;
-            const { error } = await sbClient.from('users').delete().eq('id', uid);
-            if (error) showCustomAlert("删除失败: " + error.message);
-            else { showCustomAlert(`用户 [${name}] 已删除`); loadAdminData(); }
         }
 
         async function resetUserPass(uid, name, targetRole) {
