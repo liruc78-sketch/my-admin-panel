@@ -373,7 +373,22 @@
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">加载中...</td></tr>';
 
             const search = document.getElementById('admin-search').value.trim();
-            let query = sbClient.from('users').select('id, username, hwid, is_approved, role').order('id');
+            const { data: visRows, error: visErr } = await sbClient
+                .from('sub_admin_visibility')
+                .select('target_user_id')
+                .eq('sub_admin_id', currentUser.id);
+            if (visErr) return alert("权限加载失败");
+
+            const allowedIds = (visRows || []).map(r => r.target_user_id);
+            if (allowedIds.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888;">暂无可查看的用户</td></tr>';
+                return;
+            }
+
+            let query = sbClient.from('users')
+                .select('id, username, hwid, is_approved, role')
+                .in('id', allowedIds)
+                .order('id');
             if (search) query = query.ilike('username', `%${search}%`);
 
             const { data, error } = await query;
