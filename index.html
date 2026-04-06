@@ -688,12 +688,12 @@
             if (!renewState.payAddress || !renewState.expectedAmount) return;
             try {
                 const USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
-                const targetUrl = `https://apilist.tronscanapi.com/api/token_trc20/transfers?relatedAddress=${renewState.payAddress}&limit=20&start=0&direction=in&db_version=1&start_timestamp=${Math.floor(Date.now() / 1000) - 7200}`;
+                const targetUrl = `https://apilist.tronscanapi.com/api/token_trc20/transfers?toAddress=${renewState.payAddress}&limit=20&start=0&contract_address=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t&start_timestamp=${Date.now() - 7200000}`;
                 const resp = await fetch(targetUrl, { mode: 'cors', headers: { 'TRON-PRO-API-KEY': '931c9adc-5b8c-441c-b60c-42e2da26f246' } });
                 const json = await resp.json();
                 if (!json.token_transfers || !json.token_transfers.length) return;
                 for (const tx of json.token_transfers) {
-                    if (tx.tokenAddress !== USDT_CONTRACT) continue;
+                    if (tx.contract_address !== USDT_CONTRACT) continue;
                     const txAmount = parseFloat(tx.quant) / 1e6;
                     if (Math.abs(txAmount - renewState.expectedAmount) < 0.0001) {
                         await handlePaymentSuccess(tx.transactionHash || tx.transaction_id, txAmount);
