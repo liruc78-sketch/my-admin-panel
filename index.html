@@ -696,7 +696,7 @@
                     if (tx.contract_address !== USDT_CONTRACT) continue;
                     const txAmount = parseFloat(tx.quant) / 1e6;
                     if (Math.abs(txAmount - renewState.expectedAmount) < 0.0001) {
-                        await handlePaymentSuccess(tx.transactionHash || tx.transaction_id, txAmount);
+                        await handlePaymentSuccess(tx.transaction_id, txAmount);
                         return;
                     }
                 }
