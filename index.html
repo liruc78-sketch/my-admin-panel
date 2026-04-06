@@ -688,8 +688,8 @@
             if (!renewState.payAddress || !renewState.expectedAmount) return;
             try {
                 const USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
-                const targetUrl = `https://apilist.tronscanapi.com/api/token_trc20/transfers?relatedAddress=${renewState.payAddress}&limit=20&start=0&direction=in&db_version=1&start_timestamp=${Date.now() - 3600000}`;
-                const resp = await fetch(targetUrl, { mode: 'cors' });
+                const targetUrl = `https://apilist.tronscanapi.com/api/token_trc20/transfers?relatedAddress=${renewState.payAddress}&limit=20&start=0&direction=in&db_version=1&start_timestamp=${Math.floor(Date.now() / 1000) - 7200}`;
+                const resp = await fetch(targetUrl, { mode: 'cors', headers: { 'TRON-PRO-API-KEY': '931c9adc-5b8c-441c-b60c-42e2da26f246' } });
                 const json = await resp.json();
                 if (!json.token_transfers || !json.token_transfers.length) return;
                 for (const tx of json.token_transfers) {
