@@ -464,6 +464,7 @@
             // 移除 assigned_config，列表页不需要展示它，需要时再单独查
             let query = sbClient.from('users')
                 .select('id, username, hwid, is_approved, role, remark, request_mode, expiry_date, auto_webshare')
+                .in('id', allowedIds) // 🚀 核心修复：应用权限过滤，只查询被授权可见的用户 ID
                 .order('id');
             if (search) query = query.ilike('username', `%${search}%`);
 
