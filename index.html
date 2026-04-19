@@ -379,6 +379,10 @@
         }
 
         function logout() {
+    // 清理 admin Realtime 通道
+    if (window.sbClient) {
+        window.sbClient.getChannels().forEach(ch => window.sbClient.removeChannel(ch));
+    }
             localStorage.removeItem('adminUser');
             alert("已退出登录。");
             window.close();
