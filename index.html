@@ -565,9 +565,8 @@
             if (!currentUser || currentUser.role !== 'super') return;
             console.log("[System] 管理员监听服务已启动...");
 
-            // ✅ 优化：单条频道，仅监听 request_mode 有值的 UPDATE 事件
             sbClient.channel('admin-global-alerts')
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'request_mode=neq.null' }, (payload) => {
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'request_mode=neq.null' }, (payload) => {
                     const newData = payload.new;
                     if (!newData.request_mode) return;
 
