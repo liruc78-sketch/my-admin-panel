@@ -138,6 +138,35 @@
         .login-links { margin-top: 20px; display: flex; justify-content: space-between; font-size: 12px; color: #888; }
         .link-btn { cursor: pointer; transition: 0.2s; }
         .link-btn:hover { color: var(--theme-color); }
+
+        /* ===== 续费弹窗样式 ===== */
+        .renew-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); z-index: 500000; display: flex; align-items: center; justify-content: center; }
+        .renew-card { background: #1a1a21; border-radius: 16px; border: 1px solid #333; box-shadow: 0 20px 60px rgba(0,0,0,0.6); width: 600px; max-width: 95vw; overflow: hidden; }
+        .renew-header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 20px 25px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .renew-header h3 { margin: 0; color: #fff; font-size: 17px; }
+        .renew-close { background: none; border: none; color: #888; font-size: 22px; cursor: pointer; padding: 0; line-height: 1; }
+        .renew-close:hover { color: #fff; }
+        .renew-body { padding: 25px; }
+        .month-selector { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        .month-btn { flex: 1; min-width: 70px; padding: 12px 8px; background: #252532; border: 2px solid #333; color: #ccc; border-radius: 10px; cursor: pointer; text-align: center; transition: all 0.2s; font-size: 13px; }
+        .month-btn:hover { border-color: #26a17b; color: #26a17b; }
+        .month-btn.selected { border-color: #26a17b; background: rgba(38,161,123,0.15); color: #26a17b; font-weight: bold; }
+        .month-btn .price { font-size: 11px; color: #888; margin-top: 3px; }
+        .month-btn.selected .price { color: #26a17b; }
+        .renew-confirm-btn { width: 100%; padding: 14px; background: #26a17b; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .renew-confirm-btn:hover { background: #2ecc71; }
+        .renew-confirm-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+        .pay-qr-box { text-align: center; margin-bottom: 20px; }
+        .pay-qr-box img { width: 320px; height: 320px; border-radius: 10px; border: 2px solid #26a17b; }
+        .pay-addr-box { background: #0d0d14; border: 1px solid #333; border-radius: 8px; padding: 12px 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .pay-addr-box span { font-family: monospace; font-size: 12px; color: #ccc; flex: 1; word-break: break-all; }
+        .pay-amount-badge { background: rgba(38,161,123,0.15); border: 1px solid #26a17b; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 20px; }
+        .pay-amount-badge .amount { font-size: 26px; font-weight: bold; color: #26a17b; font-family: monospace; }
+        .pay-amount-badge .hint { font-size: 11px; color: #888; margin-top: 5px; }
+        .detect-status { text-align: center; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 15px; }
+        .detect-pending { background: rgba(253,203,110,0.1); color: #fdcb6e; border: 1px solid rgba(253,203,110,0.3); }
+        .detect-success { background: rgba(0,184,148,0.1); color: #00b894; border: 1px solid rgba(0,184,148,0.3); }
+        .detect-spin { display: inline-block; width: 14px; height: 14px; border: 2px solid #fdcb6e; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
     </style>
 </head>
 <body>
@@ -166,6 +195,53 @@
         </div>
     </div>
 
+    <!-- ===== 续费弹窗 ===== -->
+    <div id="renew-overlay" class="renew-overlay" style="display:none;" onclick="if(event.target===this)closeRenewModal()">
+        <div class="renew-card">
+            <div class="renew-header">
+                <h3 id="renew-title">续费会员</h3>
+                <button class="renew-close" onclick="closeRenewModal()">×</button>
+            </div>
+            <div class="renew-body" id="renew-body">
+                <!-- 步骤1：选月数 -->
+                <div id="renew-step1">
+                    <div style="font-size:13px; color:#888; margin-bottom:15px;">当前到期：<span id="renew-current-expiry" style="color:#fdcb6e;"></span></div>
+                    <div style="font-size:13px; color:#ccc; margin-bottom:12px; font-weight:bold;">选择续费月数</div>
+                    <div class="month-selector" id="month-selector">
+                        <div class="month-btn" data-months="1" onclick="selectMonths(1,this)">1 个月<div class="price">$30</div></div>
+                        <div class="month-btn" data-months="2" onclick="selectMonths(2,this)">2 个月<div class="price">$60</div></div>
+                        <div class="month-btn" data-months="3" onclick="selectMonths(3,this)">3 个月<div class="price">$90</div></div>
+                        <div class="month-btn" data-months="6" onclick="selectMonths(6,this)">6 个月<div class="price">$180</div></div>
+                    </div>
+                    <div style="background:rgba(38,161,123,0.08); border:1px solid rgba(38,161,123,0.2); border-radius:8px; padding:10px 14px; margin-bottom:18px; font-size:12px; color:#888; line-height:1.7;">
+                        💡 支付方式：<span style="color:#26a17b; font-weight:bold;">USDT / TRC20</span><br>
+                        每月价格：<span style="color:#fff;">$30.00 USD</span>，支付完成后系统自动检测到账并续期。
+                    </div>
+                    <button class="renew-confirm-btn" id="renew-next-btn" onclick="goToPayStep()" disabled>生成付款订单 →</button>
+                </div>
+                <!-- 步骤2：付款 -->
+                <div id="renew-step2" style="display:none;">
+                    <div class="pay-amount-badge">
+                        <div style="font-size:12px; color:#888; margin-bottom:5px;">本次应付金额（精确匹配）</div>
+                        <div class="amount" id="pay-amount-display">--</div>
+                        <div class="hint" style="color:#ff4757; font-size:13px; font-weight:bold;">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
+                    </div>
+                    <div class="pay-qr-box">
+                        <img id="renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
+                        <div style="font-size:11px; color:#888; margin-top:8px;">扫码或复制地址转账</div>
+                    </div>
+                    <div class="pay-addr-box">
+                        <span id="renew-pay-addr">--</span>
+                        <button class="action-btn" style="background:#333; color:#ccc; white-space:nowrap;" onclick="copyPayAddr()">复制</button>
+                    </div>
+                    <div class="detect-status detect-pending" id="detect-status-box">
+                        <span class="detect-spin"></span>等待付款到账，自动检测中...
+                    </div>
+                    <button class="renew-confirm-btn" style="background:#333; color:#ccc;" onclick="manualCheckPayment()">手动刷新检测</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="sidebar">
         <div class="sidebar-logo">管理员后台</div>
@@ -190,7 +266,7 @@
                         <table class="admin-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
+                                    <th style="display:none;">ID</th>
                                     <th>用户名</th>
                                     <th>设备指纹 (HWID)</th>
                                     <th>状态</th>
@@ -303,6 +379,10 @@
         }
 
         function logout() {
+    // 清理 admin Realtime 通道
+    if (window.sbClient) {
+        window.sbClient.getChannels().forEach(ch => window.sbClient.removeChannel(ch));
+    }
             localStorage.removeItem('adminUser');
             alert("已退出登录。");
             window.close();
@@ -385,9 +465,10 @@
                 return;
             }
 
+            // 移除 assigned_config，列表页不需要展示它，需要时再单独查
             let query = sbClient.from('users')
-                .select('id, username, hwid, is_approved, role')
-                .in('id', allowedIds)
+                .select('id, username, hwid, is_approved, role, remark, request_mode, expiry_date, auto_webshare')
+                .in('id', allowedIds) // 🚀 核心修复：应用权限过滤，只查询被授权可见的用户 ID
                 .order('id');
             if (search) query = query.ilike('username', `%${search}%`);
 
@@ -402,16 +483,19 @@
                 const hasPermission = amISuper || !isTargetSuper;
 
                 tr.innerHTML = `
-                    <td>${u.id}</td>
+                    <td style="display:none;">${u.id}</td>
                     <td>
-                        <span style="font-weight: bold;">${u.username}${isTargetSuper ? ' <span style="color:#f1c40f; font-size:10px;">(SUPER)</span>' : ''}</span>
+                        <div style="display:flex; flex-direction: column; gap: 2px;">
+                            <span style="font-weight: bold;">${u.username}${isTargetSuper ? ' <span style="color:#f1c40f; font-size:10px;">(SUPER)</span>' : ''}</span>
+                            <div style="font-size:11px; color:#fdcb6e;">到期时间: ${formatDate(u.expiry_date)}</div>
+                        </div>
                     </td>
                     <td title="${u.hwid || ''}">${(u.hwid || '').substring(0, 10)}...</td>
                     <td><span class="status-badge ${u.is_approved ? 'status-ok' : 'status-ban'}">${u.is_approved ? '正常' : '封禁/待审'}</span></td>
                     <td>
                         <button class="action-btn toggle-status-btn ${u.is_approved ? 'status-ban' : 'status-ok'}" data-uid="${u.id}" data-status="${u.is_approved}" data-role="${u.role}">${u.is_approved ? '封禁' : '批准'}</button>
                         <button class="action-btn reset-pass-btn" style="background: #0984e3;" data-uid="${u.id}" data-uname="${u.username}" data-role="${u.role}">重置</button>
-
+                        <button class="action-btn renew-btn" style="background: #26a17b;" data-uid="${u.id}" data-uname="${u.username}" data-expiry="${u.expiry_date || ''}">续费</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -420,8 +504,22 @@
             // 绑定事件
             tbody.querySelectorAll('.toggle-status-btn').forEach(btn => btn.onclick = (e) => toggleUserStatus(e.currentTarget.dataset.uid, e.currentTarget.dataset.status === 'true', e.currentTarget.dataset.role));
             tbody.querySelectorAll('.reset-pass-btn').forEach(btn => btn.onclick = (e) => resetUserPass(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.role));
+            tbody.querySelectorAll('.renew-btn').forEach(btn => btn.onclick = (e) => openRenewModal(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.expiry));
         }
         window.loadAdminData = loadAdminData;
+
+        function formatDate(isoDate) {
+            if (!isoDate) return '<span style="color:#888;">未设置</span>';
+            try {
+                const date = new Date(isoDate);
+                const year = date.getUTCFullYear();
+                const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+                const day = date.getUTCDate().toString().padStart(2, '0');
+                return `${year}年${month}月${day}日`;
+            } catch (e) {
+                return '<span style="color:#d63031;">无效日期</span>';
+            }
+        }
 
         function checkPermission(targetRole) {
             if (currentUser.role === 'super') return true;
@@ -430,10 +528,18 @@
         }
 
         async function toggleUserStatus(uid, currentStatus, targetRole) {
-            if (!checkPermission(targetRole)) return showCustomAlert("权限不足：无法操作超级管理员！");
-            if (!await showCustomConfirm(`确定要${currentStatus ? '封禁' : '批准'}该用户吗？`)) return;
-            await sbClient.from('users').update({ is_approved: !currentStatus }).eq('id', uid);
-            loadAdminData();
+    if (!checkPermission(targetRole)) return showCustomAlert("权限不足：无法操作超级管理员！");
+    if (!await showCustomConfirm(`确定要${currentStatus ? '封禁' : '批准'}该用户吗？`)) return;
+    await sbClient.from('users').update({ is_approved: !currentStatus }).eq('id', uid);
+    // 只更新这一行的 DOM，不重新拉全表
+    const row = document.querySelector(`.toggle-status-btn[data-uid="${uid}"]`).closest('tr');
+    const badge = row.querySelector('.status-badge');
+    const btn = row.querySelector('.toggle-status-btn');
+    const newStatus = !currentStatus;
+    badge.className = `status-badge ${newStatus ? 'status-ok' : 'status-ban'}`;
+    badge.textContent = newStatus ? '正常' : '封禁/待审';
+    btn.textContent = newStatus ? '封禁' : '批准';
+    btn.dataset.status = String(newStatus);
         }
 
         async function resetUserPass(uid, name, targetRole) {
@@ -459,7 +565,7 @@
             if (!currentUser || currentUser.role !== 'super') return;
             console.log("[System] 管理员监听服务已启动...");
 
-            // ✅ 【优化】单条频道，只监听 request_mode 有值的 UPDATE 事件
+            // ✅ 优化：单条频道，仅监听 request_mode 有值的 UPDATE 事件
             sbClient.channel('admin-global-alerts')
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'request_mode=neq.null' }, (payload) => {
                     const newData = payload.new;
@@ -472,9 +578,12 @@
                     // 智能通知系统：判断环境
                     const title = '本德后台通知';
                     const body = `用户 [${newData.username}] 请求刷新服务器，请及时处理！`;
+                    // 1. 如果在 Electron 软件环境中
                     if (window.electronAPI && typeof window.electronAPI.showSysNotification === 'function') {
                         window.electronAPI.showSysNotification(title, body);
-                    } else if ('Notification' in window) {
+                    }
+                    // 2. 如果在普通浏览器环境中
+                    else if ('Notification' in window) {
                         if (Notification.permission === 'granted') {
                             new Notification(title, { body: body });
                         } else if (Notification.permission !== 'denied') {
@@ -488,6 +597,189 @@
                 })
                 .subscribe((status) => console.log("📡 管理员监听通道状态:", status));
         }
+
+        // ============================================================
+        // 💰 续费功能核心逻辑
+        // ============================================================
+        let renewState = {
+            userId: null,
+            username: null,
+            currentExpiry: null,
+            selectedMonths: 0,
+            orderId: null,
+            expectedAmount: null,
+            payAddress: null,
+            detectTimer: null
+        };
+
+        function openRenewModal(uid, uname, expiry) {
+            renewState.userId = uid;
+            renewState.username = uname;
+            renewState.currentExpiry = expiry || null;
+            renewState.selectedMonths = 0;
+            renewState.orderId = null;
+
+            document.getElementById('renew-step1').style.display = 'block';
+            document.getElementById('renew-step2').style.display = 'none';
+            document.getElementById('renew-title').textContent = `续费：${uname}`;
+            document.getElementById('renew-current-expiry').textContent = expiry ? formatDate(expiry).replace(/<[^>]+>/g, '') : '暂无（永久）';
+            document.getElementById('renew-next-btn').disabled = true;
+            document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('selected'));
+
+            document.getElementById('renew-overlay').style.display = 'flex';
+        }
+
+        function closeRenewModal() {
+            if (renewState.detectTimer) clearInterval(renewState.detectTimer);
+            renewState.detectTimer = null;
+            if (renewState.orderId) {
+                sbClient.from('renewal_orders').update({ status: 'cancelled' }).eq('id', renewState.orderId).eq('status', 'pending');
+                renewState.orderId = null;
+            }
+            document.getElementById('renew-overlay').style.display = 'none';
+        }
+
+        function selectMonths(months, el) {
+            renewState.selectedMonths = months;
+            document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
+            document.getElementById('renew-next-btn').disabled = false;
+        }
+
+        async function goToPayStep() {
+            const months = renewState.selectedMonths;
+            if (!months) return;
+
+            const { data: cfg } = await sbClient.from('app_config').select('pay_usdt_addr, pay_wechat_url').eq('id', 1).single();
+            if (!cfg || !cfg.pay_usdt_addr) return showCustomAlert("⚠️ 超级管理员尚未设置收款地址，请联系超级管理员在收款设置中配置。");
+
+            renewState.payAddress = cfg.pay_usdt_addr;
+
+            const base = months * 30;
+            const uniqueFraction = (Math.floor(Math.random() * 998) + 1).toString().padStart(3, '0');
+            const uniqueAmount = parseFloat(`${base}.${uniqueFraction}`);
+            renewState.expectedAmount = uniqueAmount;
+
+            const { data: order, error } = await sbClient.from('renewal_orders').insert({
+                user_id: parseInt(renewState.userId),
+                username: renewState.username,
+                months: months,
+                amount_usdt: uniqueAmount,
+                to_address: renewState.payAddress,
+                status: 'pending'
+            }).select().single();
+
+            if (error) return showCustomAlert("创建订单失败: " + error.message);
+            renewState.orderId = order.id;
+
+            document.getElementById('renew-step1').style.display = 'none';
+            document.getElementById('renew-step2').style.display = 'block';
+            document.getElementById('pay-amount-display').textContent = `${uniqueAmount.toFixed(3)} USDT`;
+            document.getElementById('renew-pay-addr').textContent = renewState.payAddress;
+
+            const qrImg = document.getElementById('renew-qr-img');
+            if (cfg.pay_wechat_url && cfg.pay_wechat_url.startsWith('http')) {
+                qrImg.src = cfg.pay_wechat_url;
+                qrImg.style.display = 'block';
+            } else {
+                qrImg.style.display = 'none';
+            }
+
+            document.getElementById('detect-status-box').className = 'detect-status detect-pending';
+            document.getElementById('detect-status-box').innerHTML = '<span class="detect-spin"></span>等待付款到账，每30秒自动检测一次...';
+
+            startPaymentDetection();
+        }
+
+        function copyPayAddr() {
+            navigator.clipboard.writeText(renewState.payAddress || '');
+            showCustomAlert("✅ 地址已复制");
+        }
+
+        function startPaymentDetection() {
+            if (renewState.detectTimer) clearInterval(renewState.detectTimer);
+            checkTronPayment();
+            renewState.detectTimer = setInterval(checkTronPayment, 30000);
+        }
+
+        async function checkTronPayment() {
+            if (!renewState.payAddress || !renewState.expectedAmount) return;
+            try {
+                const USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+                const targetUrl = `https://apilist.tronscanapi.com/api/token_trc20/transfers?toAddress=${renewState.payAddress}&limit=20&start=0&contract_address=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t&start_timestamp=${Date.now() - 7200000}`;
+                const resp = await fetch(targetUrl, { mode: 'cors', headers: { 'TRON-PRO-API-KEY': '931c9adc-5b8c-441c-b60c-42e2da26f246' } });
+                const json = await resp.json();
+                if (!json.token_transfers || !json.token_transfers.length) return;
+                for (const tx of json.token_transfers) {
+                    if (tx.contract_address !== USDT_CONTRACT) continue;
+                    const txAmount = parseFloat(tx.quant) / 1e6;
+                    if (Math.abs(txAmount - renewState.expectedAmount) < 0.0001) {
+                        await handlePaymentSuccess(tx.transaction_id, txAmount);
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn("[续费检测] API请求失败，将在下次重试:", e.message);
+            }
+        }
+
+        async function manualCheckPayment() {
+            document.getElementById('detect-status-box').innerHTML = '<span class="detect-spin"></span>检测中...';
+            await checkTronPayment();
+            if (document.getElementById('detect-status-box').classList.contains('detect-pending')) {
+                document.getElementById('detect-status-box').innerHTML = '<span class="detect-spin"></span>未检测到到账，等待中...';
+            }
+        }
+
+        async function handlePaymentSuccess(txHash, paidAmount) {
+            if (renewState.detectTimer) clearInterval(renewState.detectTimer);
+            renewState.detectTimer = null;
+
+            const months = renewState.selectedMonths;
+            const uid = renewState.userId;
+
+            const { data: uData } = await sbClient.from('users').select('expiry_date').eq('id', uid).single();
+            const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+            let baseDate;
+            if (uData && uData.expiry_date) {
+                const existingExpiry = new Date(uData.expiry_date);
+                baseDate = existingExpiry > nowPST ? existingExpiry : nowPST;
+            } else {
+                baseDate = nowPST;
+            }
+
+            const newExpiry = new Date(baseDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
+            const newExpiryISO = newExpiry.toISOString();
+
+            const { error: updateErr } = await sbClient.from('users').update({ expiry_date: newExpiryISO }).eq('id', uid);
+            if (updateErr) {
+                document.getElementById('detect-status-box').className = 'detect-status detect-pending';
+                document.getElementById('detect-status-box').innerHTML = '❌ 检测到付款但更新时间失败，请联系超级管理员手动处理！';
+                return;
+            }
+
+            await sbClient.from('renewal_orders').update({
+                status: 'paid',
+                paid_at: new Date().toISOString(),
+                tx_hash: txHash
+            }).eq('id', renewState.orderId);
+
+            // 显示成功弹窗
+            const successOverlay = document.createElement('div');
+            successOverlay.id = 'success-overlay';
+            successOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:999999;display:flex;align-items:center;justify-content:center;';
+            successOverlay.innerHTML = `
+                <div style="background:#1a1a21;border:1px solid #26a17b;border-radius:16px;padding:40px;text-align:center;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+                    <div style="font-size:60px;margin-bottom:15px;">✅</div>
+                    <div style="font-size:20px;font-weight:bold;color:#26a17b;margin-bottom:12px;">付款成功！</div>
+                    <div style="font-size:14px;color:#ccc;margin-bottom:6px;">已为 <span style="color:#fff;font-weight:bold;">${renewState.username}</span> 续期 <span style="color:#26a17b;font-weight:bold;">${months} 个月</span></div>
+                    <div style="font-size:13px;color:#888;margin-bottom:25px;">新到期日：<span style="color:#fdcb6e;">${formatDate(newExpiryISO).replace(/<[^>]+>/g,'')}</span></div>
+                    <button onclick="document.getElementById('success-overlay').remove();closeRenewModal();loadAdminData();" style="background:#26a17b;color:#fff;border:none;border-radius:10px;padding:12px 40px;font-size:15px;font-weight:bold;cursor:pointer;">确 定</button>
+                </div>
+            `;
+            document.body.appendChild(successOverlay);
+        }
+
     </script>
 </body>
 </html>
