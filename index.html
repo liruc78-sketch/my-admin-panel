@@ -458,9 +458,13 @@
         function initAdminRealtimeListener() {
             if (!currentUser || currentUser.role !== 'super') return;
             console.log("[System] 管理员监听服务已启动...");
-            sbClient.channel('admin-global-alerts').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'request_mode=neq.null' }, (payload) => {
-                const newData = payload.new;
-                if (newData.request_mode) {
+
+            // ✅ 【优化】单条频道，只监听 request_mode 有值的 UPDATE 事件
+            sbClient.channel('admin-global-alerts')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'request_mode=neq.null' }, (payload) => {
+                    const newData = payload.new;
+                    if (!newData.request_mode) return;
+
                     const uniqueKey = `${newData.id}_${newData.request_mode}`;
                     if (notifiedCache.has(uniqueKey)) return;
                     notifiedCache.add(uniqueKey);
@@ -468,27 +472,21 @@
                     // 智能通知系统：判断环境
                     const title = '本德后台通知';
                     const body = `用户 [${newData.username}] 请求刷新服务器，请及时处理！`;
-
-                    // 1. 如果在 Electron 软件环境中
                     if (window.electronAPI && typeof window.electronAPI.showSysNotification === 'function') {
                         window.electronAPI.showSysNotification(title, body);
-                    } 
-                    // 2. 如果在普通浏览器环境中
-                    else if ('Notification' in window) {
+                    } else if ('Notification' in window) {
                         if (Notification.permission === 'granted') {
                             new Notification(title, { body: body });
                         } else if (Notification.permission !== 'denied') {
                             Notification.requestPermission().then(permission => {
-                                if (permission === 'granted') {
-                                    new Notification(title, { body: body });
-                                }
+                                if (permission === 'granted') new Notification(title, { body: body });
                             });
                         }
                     }
 
                     if (document.getElementById('page-admin').classList.contains('active')) loadAdminData();
-                }
-            }).subscribe((status) => console.log("📡 管理员通道订阅状态:", status));
+                })
+                .subscribe((status) => console.log("📡 管理员监听通道状态:", status));
         }
     </script>
 </body>
