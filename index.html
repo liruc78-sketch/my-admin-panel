@@ -379,10 +379,11 @@
         }
 
         function logout() {
-    // 清理 admin Realtime 通道
-    if (window.sbClient) {
-        window.sbClient.getChannels().forEach(ch => window.sbClient.removeChannel(ch));
-    }
+            // 停止管理员轮询
+            if (_adminPollInterval) {
+                clearInterval(_adminPollInterval);
+                _adminPollInterval = null;
+            }
             localStorage.removeItem('adminUser');
             alert("已退出登录。");
             window.close();
@@ -574,41 +575,62 @@
             btnElement.classList.add('active');
         }
 
-        // ================= 🚀 实时监听 =================
+        // ================= 🚀 管理员轮询监听 =================
+        // 替代原 Realtime 常驻订阅（每次触发下发完整行数据，2000+ 字节）。
+        // 改为每30秒轻量轮询，仅查询 id/username/request_mode 三列，体积约 80 字节。
+        let _adminPollInterval = null;
+
         function initAdminRealtimeListener() {
-            if (!currentUser || currentUser.role !== 'super') return;
-            console.log("[System] 管理员监听服务已启动...");
+            if (!currentUser || !currentUser.is_admin) return;
+            if (_adminPollInterval) return; // 防止重复启动
+            console.log("[System] 管理员轮询监听已启动 (30s 间隔)");
 
-            sbClient.channel('admin-global-alerts')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'request_mode=neq.null' }, (payload) => {
-                    const newData = payload.new;
-                    if (!newData.request_mode) return;
+            async function pollAdminAlerts() {
+                if (!currentUser || !sbClient) return;
+                try {
+                    // 只查询3列，体积极小；仅拉取被授权可见的用户
+                    const { data: visRows } = await sbClient
+                        .from('sub_admin_visibility')
+                        .select('target_user_id')
+                        .eq('sub_admin_id', currentUser.id);
+                    const allowedIds = (visRows || []).map(r => r.target_user_id);
+                    if (allowedIds.length === 0) return;
 
-                    const uniqueKey = `${newData.id}_${newData.request_mode}`;
-                    if (notifiedCache.has(uniqueKey)) return;
-                    notifiedCache.add(uniqueKey);
+                    const { data, error } = await sbClient
+                        .from('users')
+                        .select('id, username, request_mode')
+                        .in('id', allowedIds)
+                        .not('request_mode', 'is', null);
+                    if (error || !data) return;
 
-                    // 智能通知系统：判断环境
-                    const title = '本德后台通知';
-                    const body = `用户 [${newData.username}] 请求刷新服务器，请及时处理！`;
-                    // 1. 如果在 Electron 软件环境中
-                    if (window.electronAPI && typeof window.electronAPI.showSysNotification === 'function') {
-                        window.electronAPI.showSysNotification(title, body);
-                    }
-                    // 2. 如果在普通浏览器环境中
-                    else if ('Notification' in window) {
-                        if (Notification.permission === 'granted') {
-                            new Notification(title, { body: body });
-                        } else if (Notification.permission !== 'denied') {
-                            Notification.requestPermission().then(permission => {
-                                if (permission === 'granted') new Notification(title, { body: body });
-                            });
+                    for (const newData of data) {
+                        const uniqueKey = `${newData.id}_${newData.request_mode}`;
+                        if (notifiedCache.has(uniqueKey)) continue;
+                        notifiedCache.add(uniqueKey);
+
+                        const title = '本德后台通知';
+                        const body = `用户 [${newData.username}] 请求刷新服务器，请及时处理！`;
+                        if (window.electronAPI && typeof window.electronAPI.showSysNotification === 'function') {
+                            window.electronAPI.showSysNotification(title, body);
+                        } else if ('Notification' in window) {
+                            if (Notification.permission === 'granted') {
+                                new Notification(title, { body });
+                            } else if (Notification.permission !== 'denied') {
+                                Notification.requestPermission().then(p => {
+                                    if (p === 'granted') new Notification(title, { body });
+                                });
+                            }
                         }
-                    }
 
-                    if (document.getElementById('page-admin').classList.contains('active')) loadAdminData();
-                })
-                .subscribe((status) => console.log("📡 管理员监听通道状态:", status));
+                        if (document.getElementById('page-admin').classList.contains('active')) loadAdminData();
+                    }
+                } catch(e) {
+                    console.error("[AdminPoll] 轮询失败:", e);
+                }
+            }
+
+            pollAdminAlerts(); // 登录后立即执行一次
+            _adminPollInterval = setInterval(pollAdminAlerts, 30000);
         }
 
         // ============================================================
