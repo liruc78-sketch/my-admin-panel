@@ -486,7 +486,11 @@
                     <td style="display:none;">${u.id}</td>
                     <td>
                         <div style="display:flex; flex-direction: column; gap: 2px;">
-                            <span style="font-weight: bold;">${u.username}${isTargetSuper ? ' <span style="color:#f1c40f; font-size:10px;">(SUPER)</span>' : ''}</span>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <span style="font-weight: bold;">${u.username}${isTargetSuper ? ' <span style="color:#f1c40f; font-size:10px;">(SUPER)</span>' : ''}</span>
+                                <span style="color:#888; font-size:11px;">${u.remark ? `(${u.remark})` : ''}</span>
+                                <button class="edit-remark-btn" data-uid="${u.id}" data-remark="${u.remark || ''}" data-role="${u.role}" style="background:transparent; color:#6c5ce7; font-size:16px; padding:0 5px; cursor:pointer; border:none;">✎</button>
+                            </div>
                             <div style="font-size:11px; color:#fdcb6e;">到期时间: ${formatDate(u.expiry_date)}</div>
                         </div>
                     </td>
@@ -502,6 +506,7 @@
             });
 
             // 绑定事件
+            tbody.querySelectorAll('.edit-remark-btn').forEach(btn => btn.onclick = (e) => editUserRemark(e.currentTarget.dataset.uid, e.currentTarget.dataset.remark, e.currentTarget.dataset.role));
             tbody.querySelectorAll('.toggle-status-btn').forEach(btn => btn.onclick = (e) => toggleUserStatus(e.currentTarget.dataset.uid, e.currentTarget.dataset.status === 'true', e.currentTarget.dataset.role));
             tbody.querySelectorAll('.reset-pass-btn').forEach(btn => btn.onclick = (e) => resetUserPass(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.role));
             tbody.querySelectorAll('.renew-btn').forEach(btn => btn.onclick = (e) => openRenewModal(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.expiry));
@@ -525,6 +530,15 @@
             if (currentUser.role === 'super') return true;
             if (targetRole === 'super') return false;
             return true;
+        }
+
+        async function editUserRemark(uid, currentRemark, targetRole) {
+            if (!checkPermission(targetRole)) return showCustomAlert("权限不足：无法操作超级管理员！");
+            const newRemark = await showCustomPrompt("请输入新备注 (留空则删除备注):", currentRemark || "");
+            if (newRemark === null) return;
+            const { error } = await sbClient.from('users').update({ remark: newRemark }).eq('id', uid);
+            if (error) showCustomAlert("备注修改失败: " + error.message);
+            else loadAdminData();
         }
 
         async function toggleUserStatus(uid, currentStatus, targetRole) {
