@@ -292,8 +292,14 @@
     
         try {
             // "supabase" 这个全局变量是由上面引入的库创建的
-            window.sbClient = supabase.createClient(SB_URL, SB_KEY);
-            console.log("[Admin] Supabase 客户端初始化成功。");
+            // ✅ 省流优化：禁用 Realtime WebSocket，彻底杜绝 Realtime Messages 消耗
+            window.sbClient = supabase.createClient(SB_URL, SB_KEY, {
+                realtime: { params: { eventsPerSecond: 0 } }
+            });
+            if (window.sbClient.realtime && typeof window.sbClient.realtime.disconnect === 'function') {
+                window.sbClient.realtime.disconnect();
+            }
+            console.log("[Admin] Supabase 客户端初始化成功（Realtime 已禁用）。");
         } catch (e) {
             console.error("[Admin] Supabase 客户端初始化失败:", e);
             alert("数据库连接失败，请检查网络并刷新页面。");
@@ -307,8 +313,14 @@
             // 只有在 supabase 库存在且客户端未初始化时才执行
             if (window.supabase && !sbClient) {
                 try {
-                    sbClient = window.supabase.createClient(SB_URL, SB_KEY);
-                    console.log("[Admin] Supabase 客户端初始化成功");
+                    // ✅ 省流优化：禁用 Realtime WebSocket，彻底杜绝 Realtime Messages 消耗
+                    sbClient = window.supabase.createClient(SB_URL, SB_KEY, {
+                        realtime: { params: { eventsPerSecond: 0 } }
+                    });
+                    if (sbClient.realtime && typeof sbClient.realtime.disconnect === 'function') {
+                        sbClient.realtime.disconnect();
+                    }
+                    console.log("[Admin] Supabase 客户端初始化成功（Realtime 已禁用）");
                     // 初始化成功后，立即执行后续的管理员验证逻辑
                     startAdminPanel();
                 } catch (e) {
@@ -535,41 +547,95 @@
             btnElement.classList.add('active');
         }
 
-        // ================= 🚀 实时监听 =================
+        // ================= 🚀 轮询监听（已完全禁用 Realtime WebSocket） =================
+        // ✅ 省流优化：两条极轻量查询替代全量拉取
+        //   ① 仅查有 request_mode 的用户（正常为空，响应 2 bytes）
+        //   ② 仅取最大 id 做新用户检测（响应约 10 bytes，不拉任何大字段）
+        let _adminPollTimer = null;
+        let _lastMaxUserId = null;
+
         function initAdminRealtimeListener() {
             if (!currentUser || currentUser.role !== 'super') return;
-            console.log("[System] 管理员监听服务已启动...");
-            sbClient.channel('admin-global-alerts').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'request_mode=neq.null' }, (payload) => {
-                const newData = payload.new;
-                if (newData.request_mode) {
+            console.log("[System] 管理员轮询服务已启动（Realtime WebSocket 已禁用）...");
+
+            // 确保断开任何可能存在的 Realtime 连接
+            if (sbClient.realtime && typeof sbClient.realtime.disconnect === 'function') {
+                sbClient.realtime.disconnect();
+            }
+
+            // 立即执行一次，之后每 15 秒轮询
+            pollAdminAlerts();
+            if (_adminPollTimer) clearInterval(_adminPollTimer);
+            _adminPollTimer = setInterval(pollAdminAlerts, 15000);
+        }
+
+        async function pollAdminAlerts() {
+            if (!sbClient || !currentUser) return;
+            try {
+                // ① 仅查有 request_mode 的用户 —— 正常情况返回空数组（2 bytes）
+                const { data: requestUsers } = await sbClient
+                    .from('users')
+                    .select('id, username, request_mode')
+                    .not('request_mode', 'is', null);
+
+                for (const newData of (requestUsers || [])) {
                     const uniqueKey = `${newData.id}_${newData.request_mode}`;
-                    if (notifiedCache.has(uniqueKey)) return;
-                    notifiedCache.add(uniqueKey);
+                    if (!notifiedCache.has(uniqueKey)) {
+                        notifiedCache.add(uniqueKey);
 
-                    // 智能通知系统：判断环境
-                    const title = '本德后台通知';
-                    const body = `用户 [${newData.username}] 请求刷新服务器，请及时处理！`;
+                        const title = '本德后台通知';
+                        const body = `用户 [${newData.username}] 请求刷新服务器，请及时处理！`;
+                        if (window.electronAPI && typeof window.electronAPI.showSysNotification === 'function') {
+                            window.electronAPI.showSysNotification(title, body);
+                        } else if ('Notification' in window) {
+                            if (Notification.permission === 'granted') {
+                                new Notification(title, { body });
+                            } else if (Notification.permission !== 'denied') {
+                                Notification.requestPermission().then(p => { if (p === 'granted') new Notification(title, { body }); });
+                            }
+                        }
 
-                    // 1. 如果在 Electron 软件环境中
-                    if (window.electronAPI && typeof window.electronAPI.showSysNotification === 'function') {
-                        window.electronAPI.showSysNotification(title, body);
-                    } 
-                    // 2. 如果在普通浏览器环境中
-                    else if ('Notification' in window) {
-                        if (Notification.permission === 'granted') {
-                            new Notification(title, { body: body });
-                        } else if (Notification.permission !== 'denied') {
-                            Notification.requestPermission().then(permission => {
-                                if (permission === 'granted') {
-                                    new Notification(title, { body: body });
-                                }
-                            });
+                        if (document.getElementById('page-admin').classList.contains('active')) loadAdminData();
+                    }
+                }
+
+                // ② 只取最大 id（单个数字，约 10 bytes），判断是否有新用户注册
+                const { data: maxRow } = await sbClient
+                    .from('users')
+                    .select('id')
+                    .order('id', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                const maxId = maxRow ? maxRow.id : null;
+                if (_lastMaxUserId === null) {
+                    _lastMaxUserId = maxId;
+                } else if (maxId && maxId > _lastMaxUserId) {
+                    const { data: newUsers } = await sbClient
+                        .from('users')
+                        .select('id, username')
+                        .gt('id', _lastMaxUserId)
+                        .order('id', { ascending: true });
+
+                    _lastMaxUserId = maxId;
+                    for (const newData of (newUsers || [])) {
+                        const title = '本德后台通知';
+                        const body = `新用户 [${newData.username}] 已注册，请及时审核！`;
+                        if (window.electronAPI && typeof window.electronAPI.showSysNotification === 'function') {
+                            window.electronAPI.showSysNotification(title, body);
+                        } else if ('Notification' in window) {
+                            if (Notification.permission === 'granted') {
+                                new Notification(title, { body });
+                            } else if (Notification.permission !== 'denied') {
+                                Notification.requestPermission().then(p => { if (p === 'granted') new Notification(title, { body }); });
+                            }
                         }
                     }
-
                     if (document.getElementById('page-admin').classList.contains('active')) loadAdminData();
                 }
-            }).subscribe((status) => console.log("📡 管理员通道订阅状态:", status));
+            } catch (e) {
+                console.warn("[Admin Poll] 轮询出错:", e.message);
+            }
         }
         // ============================================================
         // 💰 续费功能核心逻辑
