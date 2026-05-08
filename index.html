@@ -545,7 +545,7 @@
                         <button class="btn btn-normal" onclick="loadAdminData()">刷新列表</button>
                         <button class="btn btn-import" style="background: #26a17b;" onclick="openBatchRenewModal()">批量续费</button>
                     </div>
-                    <div style="overflow-y: auto; flex: 1;">
+                    <div id="admin-table-container" style="overflow-y: auto; flex: 1;">
                         <table class="admin-table">
                             <thead>
                                 <tr>
@@ -639,8 +639,15 @@
             }
         };
 
+        // 与 index.html 保持一致的虚拟邮箱转换函数
+        function toSafeEmail(username) {
+            let localPart = username.includes('@') ? username.split('@')[0] : username;
+            localPart = encodeURIComponent(localPart).replace(/%/g, '_');
+            return localPart + '@bendegame.internal';
+        }
+
         // ============================================================
-        // ✅ 核心修复：handleLogin 登录逻辑
+        // ✅ 核心修复：handleLogin 改用 Supabase Auth，不再依赖 password_hash
         // ============================================================
         async function handleLogin() {
             const user = document.getElementById('login-user').value.trim();
@@ -648,42 +655,41 @@
             if (!user || !pass) return await showCustomAlert("请输入用户名和密码");
 
             try {
-                const { data, error } = await sbClient
-                    .from('users')
-                    .select('*')
-                    .eq('username', user)
-                    .single();
+                // 1. 优先走 Supabase Auth 登录
+                const fakeEmail = toSafeEmail(user);
+                const { data: authResult, error: authError } = await sbClient.auth.signInWithPassword({
+                    email: fakeEmail,
+                    password: pass
+                });
 
-                // 用户不存在
-                if (error || !data) return await showCustomAlert("用户名或密码错误");
+                let userData = null;
 
-                // ✅ 修复1：对从数据库取出的 role 字段做 trim，去除 \r\n 等脏数据
-                if (data.role) data.role = data.role.trim();
-
-                // ✅ 修复2：检查 password_hash 是否存在且为字符串
-                //    该账户从未通过系统设置过密码（password_hash 为 null），无法用 bcrypt 比对
-                if (!data.password_hash || typeof data.password_hash !== 'string') {
-                    return await showCustomAlert("该账户尚未设置密码，请联系超级管理员为此账户重置密码后再登录。");
+                if (authError) {
+                    // 兼容层：Auth 失败时尝试旧 bcrypt（针对极少数未迁移账号）
+                    const { data: legacy, error: legacyErr } = await sbClient.from('users')
+                        .select('*').eq('username', user).single();
+                    if (legacyErr || !legacy || !legacy.password_hash || typeof legacy.password_hash !== 'string') {
+                        return await showCustomAlert("用户名或密码错误");
+                    }
+                    let match = false;
+                    try { match = dcodeIO.bcrypt.compareSync(pass, legacy.password_hash); } catch(e) {}
+                    if (!match) return await showCustomAlert("用户名或密码错误");
+                    userData = legacy;
+                } else {
+                    // 2. Auth 成功，用 auth_id 查业务数据
+                    const { data, error } = await sbClient.from('users')
+                        .select('*').eq('auth_id', authResult.user.id).single();
+                    if (error || !data) return await showCustomAlert("用户数据异常，请联系超级管理员");
+                    userData = data;
                 }
 
-                // ✅ 修复3：bcrypt 比对时做 try-catch 防御，避免任何意外参数导致崩溃
-                let match = false;
-                try {
-                    match = dcodeIO.bcrypt.compareSync(pass, data.password_hash);
-                } catch (bcryptErr) {
-                    console.error("[Login] bcrypt 比对出错:", bcryptErr);
-                    return await showCustomAlert("密码验证失败，请联系超级管理员检查账户数据。");
-                }
+                // trim role 防止脏数据
+                if (userData.role) userData.role = userData.role.trim();
 
-                if (!match) return await showCustomAlert("用户名或密码错误");
+                if (!userData.is_admin) return await showCustomAlert("非管理员账户，禁止登录");
 
-                if (!data.is_admin) {
-                    return await showCustomAlert("非管理员账户，禁止登录");
-                }
-
-                currentUser = data;
+                currentUser = userData;
                 localStorage.setItem('adminUser', JSON.stringify(currentUser));
-                
                 document.getElementById('login-overlay').style.display = 'none';
                 loadAdminData();
                 initAdminRealtimeListener();
@@ -762,7 +768,13 @@
             if (!currentUser || !currentUser.is_admin) return;
             
             const tbody = document.getElementById('admin-user-list');
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">加载中...</td></tr>';
+            const container = document.getElementById('admin-table-container');
+            const scrollPos = container ? container.scrollTop : 0; // 记录当前滚动位置
+
+            // 仅在首次加载（列表为空）时显示加载提示，避免滚动条塌陷
+            if (tbody.innerHTML.trim() === '') {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;">加载中...</td></tr>';
+            }
 
             const search = document.getElementById('admin-search').value.trim();
             const { data: visRows, error: visErr } = await sbClient
@@ -823,6 +835,11 @@
             tbody.querySelectorAll('.toggle-status-btn').forEach(btn => btn.onclick = (e) => toggleUserStatus(e.currentTarget.dataset.uid, e.currentTarget.dataset.status === 'true', e.currentTarget.dataset.role));
             tbody.querySelectorAll('.reset-pass-btn').forEach(btn => btn.onclick = (e) => resetUserPass(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.role));
             tbody.querySelectorAll('.renew-btn').forEach(btn => btn.onclick = (e) => openRenewModal(e.currentTarget.dataset.uid, e.currentTarget.dataset.uname, e.currentTarget.dataset.expiry));
+            
+            // 恢复滚动位置，确保用户的视觉停留在操作前的地方
+            if (container) {
+                setTimeout(() => { container.scrollTop = scrollPos; }, 10);
+            }
         }
         window.loadAdminData = loadAdminData;
 
