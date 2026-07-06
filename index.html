@@ -1053,7 +1053,9 @@
                 months: months,
                 amount_usdt: uniqueAmount,
                 to_address: renewState.payAddress,
-                status: 'pending'
+                status: 'pending',
+                operator_id: (currentUser && currentUser.id) || null,
+                operator_name: (currentUser && currentUser.username) || null
             }).select().single();
 
             if (error) return showCustomAlert("创建订单失败: " + error.message);
@@ -1278,7 +1280,9 @@
                 amount_usdt: uniqueAmount,
                 to_address: batchRenewState.payAddress,
                 status: 'pending',
-                batch_items: batchItems
+                batch_items: batchItems,
+                operator_id: (currentUser && currentUser.id) || null,
+                operator_name: (currentUser && currentUser.username) || null
             }).select().single();
 
             if (error) return showCustomAlert("创建订单失败: " + error.message);
