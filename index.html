@@ -141,10 +141,10 @@
 
         /* ===== 续费弹窗样式 ===== */
         .renew-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); z-index: 500000; display: flex; align-items: center; justify-content: center; }
-        .renew-card { background: #1a1a21; border-radius: 16px; border: 1px solid #333; box-shadow: 0 20px 60px rgba(0,0,0,0.6); width: 600px; max-width: 95vw; overflow: hidden; }
-        .renew-header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 20px 25px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
-        .renew-header h3 { margin: 0; color: #fff; font-size: 17px; }
-        .renew-close { background: none; border: none; color: #888; font-size: 22px; cursor: pointer; padding: 0; line-height: 1; }
+        .renew-card { background: #15151b; border-radius: 18px; border: 1px solid #2c2c38; box-shadow: 0 24px 70px rgba(0,0,0,0.65); width: 600px; max-width: 95vw; max-height: 92vh; overflow-y: auto; overflow-x: hidden; }
+        .renew-header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 20px 25px; border-bottom: 1px solid #2c2c38; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 2; }
+        .renew-header h3 { margin: 0; color: #fff; font-size: 17px; letter-spacing: .5px; }
+        .renew-close { background: none; border: none; color: #888; font-size: 22px; cursor: pointer; padding: 0; line-height: 1; transition: color .2s; }
         .renew-close:hover { color: #fff; }
         .renew-body { padding: 25px; }
         .month-selector { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -156,17 +156,37 @@
         .renew-confirm-btn { width: 100%; padding: 14px; background: #26a17b; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
         .renew-confirm-btn:hover { background: #2ecc71; }
         .renew-confirm-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
-        .pay-qr-box { text-align: center; margin-bottom: 20px; }
-        .pay-qr-box img { width: 320px; height: 320px; border-radius: 10px; border: 2px solid #26a17b; }
-        .pay-addr-box { background: #0d0d14; border: 1px solid #333; border-radius: 8px; padding: 12px 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
-        .pay-addr-box span { font-family: monospace; font-size: 12px; color: #ccc; flex: 1; word-break: break-all; }
-        .pay-amount-badge { background: rgba(38,161,123,0.15); border: 1px solid #26a17b; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 20px; }
-        .pay-amount-badge .amount { font-size: 26px; font-weight: bold; color: #26a17b; font-family: monospace; }
-        .pay-amount-badge .hint { font-size: 11px; color: #888; margin-top: 5px; }
-        .detect-status { text-align: center; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 15px; }
+        .renew-refresh-btn { background: #23232e; color: #c7c7d2; border: 1px solid #33333f; margin-top: 2px; }
+        .renew-refresh-btn:hover { background: #2c2c3a; color: #fff; }
+        /* 应付金额 */
+        .pay-amount-badge { background: #14141b; border: 1px solid #2c2c38; border-radius: 14px; padding: 18px 16px; text-align: center; margin-bottom: 20px; }
+        .pay-amount-label { font-size: 12px; color: #9aa4ad; letter-spacing: 1px; margin-bottom: 6px; }
+        .pay-amount-badge .amount { font-size: 34px; font-weight: 800; color: #ff7043; font-family: 'SF Mono', Consolas, monospace; letter-spacing: 1px; line-height: 1.1; }
+        .pay-amount-badge .hint { font-size: 12px; color: #ff6b6b; font-weight: 600; margin-top: 8px; }
+        /* 二维码 */
+        .pay-qr-box { text-align: center; margin-bottom: 18px; }
+        .pay-qr-frame { display: inline-block; background: #fff; padding: 14px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.45), 0 0 0 1px rgba(38,161,123,0.45), 0 0 0 6px rgba(38,161,123,0.10); }
+        .pay-qr-frame img { display: block; width: 240px; height: 240px; border-radius: 6px; }
+        .pay-qr-caption { font-size: 12px; color: #8a8a99; margin-top: 12px; }
+        /* 收款地址 */
+        .pay-addr-box { background: #0c0c12; border: 1px solid #2c2c38; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+        .pay-addr-box span { font-family: 'SF Mono', Consolas, monospace; font-size: 12.5px; color: #d0d0da; flex: 1; word-break: break-all; text-align: left; letter-spacing: .3px; }
+        .pay-copy-btn { background: rgba(38,161,123,0.15); color: #2ee6a6; border: 1px solid rgba(38,161,123,0.5); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .2s; }
+        .pay-copy-btn:hover { background: #26a17b; color: #fff; }
+        /* 检测状态 */
+        .detect-status { text-align: center; padding: 12px; border-radius: 10px; font-size: 13px; margin-bottom: 14px; }
         .detect-pending { background: rgba(253,203,110,0.1); color: #fdcb6e; border: 1px solid rgba(253,203,110,0.3); }
-        .detect-success { background: rgba(0,184,148,0.1); color: #00b894; border: 1px solid rgba(0,184,148,0.3); }
+        .detect-success { background: rgba(0,184,148,0.12); color: #00e0a4; border: 1px solid rgba(0,184,148,0.35); }
         .detect-spin { display: inline-block; width: 14px; height: 14px; border: 2px solid #fdcb6e; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+        /* 支付说明 */
+        .pay-notice { margin-top: 20px; background: #101017; border: 1px solid #26262f; border-radius: 12px; padding: 16px 18px; }
+        .pay-notice-title { font-size: 13px; font-weight: 700; color: #e0e0ea; margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
+        .pay-notice-title::before { content: ''; width: 3px; height: 14px; background: #26a17b; border-radius: 2px; }
+        .pay-notice-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 11px 20px; counter-reset: paynote; }
+        .pay-notice-list li { position: relative; counter-increment: paynote; padding-left: 27px; font-size: 12px; color: #9a9aa8; line-height: 1.6; }
+        .pay-notice-list li::before { content: counter(paynote); position: absolute; left: 0; top: 1px; width: 18px; height: 18px; background: rgba(38,161,123,0.15); color: #2ee6a6; border: 1px solid rgba(38,161,123,0.4); border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+        .pay-notice-list li b { color: #ff8a5c; font-weight: 700; }
+        @media (max-width: 560px) { .pay-notice-list { grid-template-columns: 1fr; } .pay-qr-frame img { width: 200px; height: 200px; } }
         .batch-user-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #2a2a31; transition: background 0.2s; }
         .batch-user-item:hover { background: #1f1f2e; }
         .batch-user-info { display: flex; flex-direction: column; gap: 4px; }
@@ -205,7 +225,7 @@
     <div id="renew-overlay" class="renew-overlay" style="display:none;" onclick="if(event.target===this)closeRenewModal()">
         <div class="renew-card">
             <div class="renew-header">
-                <h3 id="renew-title">续费会员</h3>
+                <h3 id="renew-title">本德爬虫续费会员</h3>
                 <button class="renew-close" onclick="closeRenewModal()">×</button>
             </div>
             <div class="renew-body" id="renew-body">
@@ -228,22 +248,29 @@
                 <!-- 步骤2：付款 -->
                 <div id="renew-step2" style="display:none;">
                     <div class="pay-amount-badge">
-                        <div style="font-size:12px; color:#888; margin-bottom:5px;">本次应付金额（精确匹配）</div>
+                        <div class="pay-amount-label">本次应付金额（精确匹配）</div>
                         <div class="amount" id="pay-amount-display">--</div>
-                        <div class="hint" style="color:#ff4757; font-size:13px; font-weight:bold;">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
+                        <div class="hint">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
                     </div>
                     <div class="pay-qr-box">
-                        <img id="renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
-                        <div style="font-size:11px; color:#888; margin-top:8px;">扫码或复制地址转账</div>
+                        <div class="pay-qr-frame">
+                            <img id="renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
+                        </div>
+                        <div class="pay-qr-caption">扫描二维码或复制地址转账 · USDT-TRC20</div>
                     </div>
                     <div class="pay-addr-box">
                         <span id="renew-pay-addr">--</span>
-                        <button class="action-btn" style="background:#333; color:#ccc; white-space:nowrap;" onclick="copyPayAddr()">复制</button>
+                        <button class="pay-copy-btn" onclick="copyPayAddr()">复制</button>
                     </div>
-                    <div class="detect-status detect-pending" id="detect-status-box">
-                        <span class="detect-spin"></span>等待付款到账，自动检测中...
+                    <div class="pay-notice">
+                        <div class="pay-notice-title">支付说明</div>
+                        <ol class="pay-notice-list">
+                            <li>请使用 USDT 钱包扫描二维码，或复制地址进行转账。</li>
+                            <li>转账金额必须与上方应付金额<b>完全一致</b>（精确到小数点后三位），系统凭此识别您的订单。</li>
+                            <li>支付完成后系统会自动确认，通常需要 3-10 分钟到账并自动续期。</li>
+                            <li>若已经转账、会员没到账，请联系客服。</li>
+                        </ol>
                     </div>
-                    <button class="renew-confirm-btn" style="background:#333; color:#ccc;" onclick="manualCheckPayment()">手动刷新检测</button>
                 </div>
             </div>
         </div>
@@ -274,252 +301,33 @@
                 <!-- 步骤2：付款 -->
                 <div id="batch-renew-step2" style="display:none;">
                     <div class="pay-amount-badge">
-                        <div style="font-size:12px; color:#888; margin-bottom:5px;">本次应付总金额（精确匹配）</div>
+                        <div class="pay-amount-label">本次应付总金额（精确匹配）</div>
                         <div class="amount" id="batch-pay-amount-display">--</div>
-                        <div class="hint" style="color:#ff4757; font-size:13px; font-weight:bold;">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
+                        <div class="hint">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
                     </div>
                     <div class="pay-qr-box">
-                        <img id="batch-renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
-                        <div style="font-size:11px; color:#888; margin-top:8px;">扫码或复制地址转账</div>
+                        <div class="pay-qr-frame">
+                            <img id="batch-renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
+                        </div>
+                        <div class="pay-qr-caption">扫描二维码或复制地址转账 · USDT-TRC20</div>
                     </div>
                     <div class="pay-addr-box">
                         <span id="batch-renew-pay-addr">--</span>
-                        <button class="action-btn" style="background:#333; color:#ccc; white-space:nowrap;" onclick="copyBatchPayAddr()">复制</button>
+                        <button class="pay-copy-btn" onclick="copyBatchPayAddr()">复制</button>
                     </div>
                     <div class="detect-status detect-pending" id="batch-detect-status-box">
                         <span class="detect-spin"></span>等待付款到账，自动检测中...
                     </div>
-                    <button class="renew-confirm-btn" style="background:#333; color:#ccc;" onclick="manualCheckBatchPayment()">手动刷新检测</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== 批量续费弹窗 ===== -->
-    <div id="batch-renew-overlay" class="renew-overlay" style="display:none;" onclick="if(event.target===this)closeBatchRenewModal()">
-        <div class="renew-card" style="width: 650px;">
-            <div class="renew-header">
-                <h3 id="batch-renew-title">批量续费</h3>
-                <button class="renew-close" onclick="closeBatchRenewModal()">×</button>
-            </div>
-            <div class="renew-body">
-                <!-- 步骤1：选用户和月数 -->
-                <div id="batch-renew-step1">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                        <input type="text" id="batch-search" class="form-input" placeholder="搜索用户..." style="width: 100%;" oninput="renderBatchUserList()">
+                    <button class="renew-confirm-btn renew-refresh-btn" onclick="manualCheckBatchPayment()">🔄 手动刷新检测</button>
+                    <div class="pay-notice">
+                        <div class="pay-notice-title">支付说明</div>
+                        <ol class="pay-notice-list">
+                            <li>请使用 USDT 钱包扫描二维码，或复制地址进行转账。</li>
+                            <li>转账金额必须与上方应付金额<b>完全一致</b>（精确到小数点后三位），系统凭此识别订单。</li>
+                            <li>支付完成后系统会自动确认，通常需要 3-10 分钟到账并自动续期。</li>
+                            <li>如长时间未到账，可点击「手动刷新检测」；请勿重复转账。</li>
+                        </ol>
                     </div>
-                    <div id="batch-user-list" style="max-height: 350px; overflow-y: auto; background: #121217; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
-                        <!-- 用户列表将在这里渲染 -->
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding: 15px; background: rgba(38,161,123,0.1); border: 1px solid rgba(38,161,123,0.3); border-radius: 8px;">
-                        <span style="color:#ccc; font-size:14px;">总计续费: <span id="batch-total-months" style="color:#26a17b; font-weight:bold; font-size:16px;">0</span> 个月</span>
-                        <span style="color:#ccc; font-size:14px;">总金额: <span id="batch-total-price" style="color:#26a17b; font-weight:bold; font-size: 22px;">$0</span></span>
-                    </div>
-                    <button class="renew-confirm-btn" id="batch-renew-next-btn" onclick="goToBatchPayStep()" disabled>生成合并付款订单 →</button>
-                </div>
-                <!-- 步骤2：付款 -->
-                <div id="batch-renew-step2" style="display:none;">
-                    <div class="pay-amount-badge">
-                        <div style="font-size:12px; color:#888; margin-bottom:5px;">本次应付总金额（精确匹配）</div>
-                        <div class="amount" id="batch-pay-amount-display">--</div>
-                        <div class="hint" style="color:#ff4757; font-size:13px; font-weight:bold;">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
-                    </div>
-                    <div class="pay-qr-box">
-                        <img id="batch-renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
-                        <div style="font-size:11px; color:#888; margin-top:8px;">扫码或复制地址转账</div>
-                    </div>
-                    <div class="pay-addr-box">
-                        <span id="batch-renew-pay-addr">--</span>
-                        <button class="action-btn" style="background:#333; color:#ccc; white-space:nowrap;" onclick="copyBatchPayAddr()">复制</button>
-                    </div>
-                    <div class="detect-status detect-pending" id="batch-detect-status-box">
-                        <span class="detect-spin"></span>等待付款到账，自动检测中...
-                    </div>
-                    <button class="renew-confirm-btn" style="background:#333; color:#ccc;" onclick="manualCheckBatchPayment()">手动刷新检测</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== 批量续费弹窗 ===== -->
-    <div id="batch-renew-overlay" class="renew-overlay" style="display:none;" onclick="if(event.target===this)closeBatchRenewModal()">
-        <div class="renew-card" style="width: 650px;">
-            <div class="renew-header">
-                <h3 id="batch-renew-title">批量续费</h3>
-                <button class="renew-close" onclick="closeBatchRenewModal()">×</button>
-            </div>
-            <div class="renew-body">
-                <!-- 步骤1：选用户和月数 -->
-                <div id="batch-renew-step1">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                        <input type="text" id="batch-search" class="form-input" placeholder="搜索用户..." style="width: 100%;" oninput="renderBatchUserList()">
-                    </div>
-                    <div id="batch-user-list" style="max-height: 350px; overflow-y: auto; background: #121217; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
-                        <!-- 用户列表将在这里渲染 -->
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding: 15px; background: rgba(38,161,123,0.1); border: 1px solid rgba(38,161,123,0.3); border-radius: 8px;">
-                        <span style="color:#ccc; font-size:14px;">总计续费: <span id="batch-total-months" style="color:#26a17b; font-weight:bold; font-size:16px;">0</span> 个月</span>
-                        <span style="color:#ccc; font-size:14px;">总金额: <span id="batch-total-price" style="color:#26a17b; font-weight:bold; font-size: 22px;">$0</span></span>
-                    </div>
-                    <button class="renew-confirm-btn" id="batch-renew-next-btn" onclick="goToBatchPayStep()" disabled>生成合并付款订单 →</button>
-                </div>
-                <!-- 步骤2：付款 -->
-                <div id="batch-renew-step2" style="display:none;">
-                    <div class="pay-amount-badge">
-                        <div style="font-size:12px; color:#888; margin-bottom:5px;">本次应付总金额（精确匹配）</div>
-                        <div class="amount" id="batch-pay-amount-display">--</div>
-                        <div class="hint" style="color:#ff4757; font-size:13px; font-weight:bold;">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
-                    </div>
-                    <div class="pay-qr-box">
-                        <img id="batch-renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
-                        <div style="font-size:11px; color:#888; margin-top:8px;">扫码或复制地址转账</div>
-                    </div>
-                    <div class="pay-addr-box">
-                        <span id="batch-renew-pay-addr">--</span>
-                        <button class="action-btn" style="background:#333; color:#ccc; white-space:nowrap;" onclick="copyBatchPayAddr()">复制</button>
-                    </div>
-                    <div class="detect-status detect-pending" id="batch-detect-status-box">
-                        <span class="detect-spin"></span>等待付款到账，自动检测中...
-                    </div>
-                    <button class="renew-confirm-btn" style="background:#333; color:#ccc;" onclick="manualCheckBatchPayment()">手动刷新检测</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== 批量续费弹窗 ===== -->
-    <div id="batch-renew-overlay" class="renew-overlay" style="display:none;" onclick="if(event.target===this)closeBatchRenewModal()">
-        <div class="renew-card" style="width: 650px;">
-            <div class="renew-header">
-                <h3 id="batch-renew-title">批量续费</h3>
-                <button class="renew-close" onclick="closeBatchRenewModal()">×</button>
-            </div>
-            <div class="renew-body">
-                <!-- 步骤1：选用户和月数 -->
-                <div id="batch-renew-step1">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                        <input type="text" id="batch-search" class="form-input" placeholder="搜索用户..." style="width: 100%;" oninput="renderBatchUserList()">
-                    </div>
-                    <div id="batch-user-list" style="max-height: 350px; overflow-y: auto; background: #121217; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
-                        <!-- 用户列表将在这里渲染 -->
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding: 15px; background: rgba(38,161,123,0.1); border: 1px solid rgba(38,161,123,0.3); border-radius: 8px;">
-                        <span style="color:#ccc; font-size:14px;">总计续费: <span id="batch-total-months" style="color:#26a17b; font-weight:bold; font-size:16px;">0</span> 个月</span>
-                        <span style="color:#ccc; font-size:14px;">总金额: <span id="batch-total-price" style="color:#26a17b; font-weight:bold; font-size: 22px;">$0</span></span>
-                    </div>
-                    <button class="renew-confirm-btn" id="batch-renew-next-btn" onclick="goToBatchPayStep()" disabled>生成合并付款订单 →</button>
-                </div>
-                <!-- 步骤2：付款 -->
-                <div id="batch-renew-step2" style="display:none;">
-                    <div class="pay-amount-badge">
-                        <div style="font-size:12px; color:#888; margin-bottom:5px;">本次应付总金额（精确匹配）</div>
-                        <div class="amount" id="batch-pay-amount-display">--</div>
-                        <div class="hint" style="color:#ff4757; font-size:13px; font-weight:bold;">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
-                    </div>
-                    <div class="pay-qr-box">
-                        <img id="batch-renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
-                        <div style="font-size:11px; color:#888; margin-top:8px;">扫码或复制地址转账</div>
-                    </div>
-                    <div class="pay-addr-box">
-                        <span id="batch-renew-pay-addr">--</span>
-                        <button class="action-btn" style="background:#333; color:#ccc; white-space:nowrap;" onclick="copyBatchPayAddr()">复制</button>
-                    </div>
-                    <div class="detect-status detect-pending" id="batch-detect-status-box">
-                        <span class="detect-spin"></span>等待付款到账，自动检测中...
-                    </div>
-                    <button class="renew-confirm-btn" style="background:#333; color:#ccc;" onclick="manualCheckBatchPayment()">手动刷新检测</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== 批量续费弹窗 ===== -->
-    <div id="batch-renew-overlay" class="renew-overlay" style="display:none;" onclick="if(event.target===this)closeBatchRenewModal()">
-        <div class="renew-card" style="width: 650px;">
-            <div class="renew-header">
-                <h3 id="batch-renew-title">批量续费</h3>
-                <button class="renew-close" onclick="closeBatchRenewModal()">×</button>
-            </div>
-            <div class="renew-body">
-                <!-- 步骤1：选用户和月数 -->
-                <div id="batch-renew-step1">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                        <input type="text" id="batch-search" class="form-input" placeholder="搜索用户..." style="width: 100%;" oninput="renderBatchUserList()">
-                    </div>
-                    <div id="batch-user-list" style="max-height: 350px; overflow-y: auto; background: #121217; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
-                        <!-- 用户列表将在这里渲染 -->
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding: 15px; background: rgba(38,161,123,0.1); border: 1px solid rgba(38,161,123,0.3); border-radius: 8px;">
-                        <span style="color:#ccc; font-size:14px;">总计续费: <span id="batch-total-months" style="color:#26a17b; font-weight:bold; font-size:16px;">0</span> 个月</span>
-                        <span style="color:#ccc; font-size:14px;">总金额: <span id="batch-total-price" style="color:#26a17b; font-weight:bold; font-size: 22px;">$0</span></span>
-                    </div>
-                    <button class="renew-confirm-btn" id="batch-renew-next-btn" onclick="goToBatchPayStep()" disabled>生成合并付款订单 →</button>
-                </div>
-                <!-- 步骤2：付款 -->
-                <div id="batch-renew-step2" style="display:none;">
-                    <div class="pay-amount-badge">
-                        <div style="font-size:12px; color:#888; margin-bottom:5px;">本次应付总金额（精确匹配）</div>
-                        <div class="amount" id="batch-pay-amount-display">--</div>
-                        <div class="hint" style="color:#ff4757; font-size:13px; font-weight:bold;">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
-                    </div>
-                    <div class="pay-qr-box">
-                        <img id="batch-renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
-                        <div style="font-size:11px; color:#888; margin-top:8px;">扫码或复制地址转账</div>
-                    </div>
-                    <div class="pay-addr-box">
-                        <span id="batch-renew-pay-addr">--</span>
-                        <button class="action-btn" style="background:#333; color:#ccc; white-space:nowrap;" onclick="copyBatchPayAddr()">复制</button>
-                    </div>
-                    <div class="detect-status detect-pending" id="batch-detect-status-box">
-                        <span class="detect-spin"></span>等待付款到账，自动检测中...
-                    </div>
-                    <button class="renew-confirm-btn" style="background:#333; color:#ccc;" onclick="manualCheckBatchPayment()">手动刷新检测</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== 批量续费弹窗 ===== -->
-    <div id="batch-renew-overlay" class="renew-overlay" style="display:none;" onclick="if(event.target===this)closeBatchRenewModal()">
-        <div class="renew-card" style="width: 650px;">
-            <div class="renew-header">
-                <h3 id="batch-renew-title">批量续费</h3>
-                <button class="renew-close" onclick="closeBatchRenewModal()">×</button>
-            </div>
-            <div class="renew-body">
-                <!-- 步骤1：选用户和月数 -->
-                <div id="batch-renew-step1">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                        <input type="text" id="batch-search" class="form-input" placeholder="搜索用户..." style="width: 100%;" oninput="renderBatchUserList()">
-                    </div>
-                    <div id="batch-user-list" style="max-height: 350px; overflow-y: auto; background: #121217; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
-                        <!-- 用户列表将在这里渲染 -->
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding: 15px; background: rgba(38,161,123,0.1); border: 1px solid rgba(38,161,123,0.3); border-radius: 8px;">
-                        <span style="color:#ccc; font-size:14px;">总计续费: <span id="batch-total-months" style="color:#26a17b; font-weight:bold; font-size:16px;">0</span> 个月</span>
-                        <span style="color:#ccc; font-size:14px;">总金额: <span id="batch-total-price" style="color:#26a17b; font-weight:bold; font-size: 22px;">$0</span></span>
-                    </div>
-                    <button class="renew-confirm-btn" id="batch-renew-next-btn" onclick="goToBatchPayStep()" disabled>生成合并付款订单 →</button>
-                </div>
-                <!-- 步骤2：付款 -->
-                <div id="batch-renew-step2" style="display:none;">
-                    <div class="pay-amount-badge">
-                        <div style="font-size:12px; color:#888; margin-bottom:5px;">本次应付总金额（精确匹配）</div>
-                        <div class="amount" id="batch-pay-amount-display">--</div>
-                        <div class="hint" style="color:#ff4757; font-size:13px; font-weight:bold;">🚨 请务必转账精确金额，系统凭此识别您的订单</div>
-                    </div>
-                    <div class="pay-qr-box">
-                        <img id="batch-renew-qr-img" src="" onerror="this.style.display='none'" alt="收款二维码">
-                        <div style="font-size:11px; color:#888; margin-top:8px;">扫码或复制地址转账</div>
-                    </div>
-                    <div class="pay-addr-box">
-                        <span id="batch-renew-pay-addr">--</span>
-                        <button class="action-btn" style="background:#333; color:#ccc; white-space:nowrap;" onclick="copyBatchPayAddr()">复制</button>
-                    </div>
-                    <div class="detect-status detect-pending" id="batch-detect-status-box">
-                        <span class="detect-spin"></span>等待付款到账，自动检测中...
-                    </div>
-                    <button class="renew-confirm-btn" style="background:#333; color:#ccc;" onclick="manualCheckBatchPayment()">手动刷新检测</button>
                 </div>
             </div>
         </div>
@@ -1012,7 +820,7 @@
 
             document.getElementById('renew-step1').style.display = 'block';
             document.getElementById('renew-step2').style.display = 'none';
-            document.getElementById('renew-title').textContent = `续费：${uname}`;
+            document.getElementById('renew-title').textContent = `本德爬虫续费：${uname}`;
             document.getElementById('renew-current-expiry').textContent = expiry ? (()=>{ const d=new Date(expiry); return `${d.getUTCFullYear()}年${String(d.getUTCMonth()+1).padStart(2,'0')}月${String(d.getUTCDate()).padStart(2,'0')}日`; })() : '暂无（永久）';
             document.getElementById('renew-next-btn').disabled = true;
             document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('selected'));
@@ -1024,6 +832,16 @@
             if (renewState.detectTimer) clearInterval(renewState.detectTimer);
             renewState.detectTimer = null;
             document.getElementById('renew-overlay').style.display = 'none';
+        }
+
+        // 收款二维码：不再使用后台固定上传的图片，改为根据当前收款地址实时生成。
+        // 扫码得到的即为该 USDT-TRC20 地址；管理员在「收款设置」改地址后二维码自动跟随。
+        function renderAddressQr(imgEl, address) {
+            if (!imgEl) return;
+            const addr = (address || '').trim();
+            if (!addr) { imgEl.removeAttribute('src'); imgEl.style.display = 'none'; return; }
+            imgEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(addr);
+            imgEl.style.display = 'block';
         }
 
         function selectMonths(months, el) {
@@ -1066,16 +884,8 @@
             document.getElementById('pay-amount-display').textContent = `${uniqueAmount.toFixed(3)} USDT`;
             document.getElementById('renew-pay-addr').textContent = renewState.payAddress;
 
-            const qrImg = document.getElementById('renew-qr-img');
-            if (cfg.pay_wechat_url && cfg.pay_wechat_url.startsWith('http')) {
-                qrImg.src = cfg.pay_wechat_url;
-                qrImg.style.display = 'block';
-            } else {
-                qrImg.style.display = 'none';
-            }
-
-            document.getElementById('detect-status-box').className = 'detect-status detect-pending';
-            document.getElementById('detect-status-box').innerHTML = '<span class="detect-spin"></span>等待付款到账，每30秒自动检测一次...';
+            // 收款二维码根据收款地址实时生成，扫码即为该 USDT-TRC20 地址
+            renderAddressQr(document.getElementById('renew-qr-img'), renewState.payAddress);
 
             startPaymentDetection();
         }
@@ -1293,13 +1103,8 @@
             document.getElementById('batch-pay-amount-display').textContent = `${uniqueAmount.toFixed(3)} USDT`;
             document.getElementById('batch-renew-pay-addr').textContent = batchRenewState.payAddress;
 
-            const qrImg = document.getElementById('batch-renew-qr-img');
-            if (cfg.pay_wechat_url && cfg.pay_wechat_url.startsWith('http')) {
-                qrImg.src = cfg.pay_wechat_url;
-                qrImg.style.display = 'block';
-            } else {
-                qrImg.style.display = 'none';
-            }
+            // 收款二维码根据收款地址实时生成，扫码即为该 USDT-TRC20 地址
+            renderAddressQr(document.getElementById('batch-renew-qr-img'), batchRenewState.payAddress);
 
             document.getElementById('batch-detect-status-box').className = 'detect-status detect-pending';
             document.getElementById('batch-detect-status-box').innerHTML = '<span class="detect-spin"></span>等待付款到账，每30秒自动检测一次...';
