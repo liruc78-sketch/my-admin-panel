@@ -904,10 +904,10 @@
         async function checkTronPayment() {
             if (!renewState.orderId) return;
             try {
-                // 安全改造：链上校验 + 到期写入全部由服务端 verify-renewal 边缘函数完成，
-                // 前端不再直接查询链、不再持有 API Key、不再直接写 expiry_date。
-                const { data, error } = await sbClient.functions.invoke('verify-renewal', {
-                    body: { order_id: renewState.orderId }
+                // 链上校验 + 到期写入由服务端 RPC admin_settle_order 完成（走数据库 http 扩展直连 TronGrid，
+                // 这条路是通的；后台每分钟定时任务 scan_pending_renewals 也会兜底自动到账）。
+                const { data, error } = await sbClient.rpc('admin_settle_order', {
+                    p_order_id: renewState.orderId
                 });
                 if (error) {
                     const box = document.getElementById('detect-status-box');
@@ -918,7 +918,7 @@
                     return;
                 }
                 if (data && data.success) {
-                    const exp = (data.allocations && data.allocations[0] && data.allocations[0].expiry) || null;
+                    const exp = (data.settle && data.settle.allocations && data.settle.allocations[0] && data.settle.allocations[0].expiry) || null;
                     await handlePaymentSuccess(data.tx_hash, exp);
                 }
                 // 未检测到到账则继续轮询
@@ -939,7 +939,7 @@
             if (renewState.detectTimer) clearInterval(renewState.detectTimer);
             renewState.detectTimer = null;
 
-            // 到期时间已由服务端 verify-renewal 写入，这里只负责展示。
+            // 到期时间已由服务端 admin_settle_order / 定时任务写入，这里只负责展示。
             const months = renewState.selectedMonths;
             let newExpiryDisplay = '';
             if (newExpiryStr) {
@@ -1077,7 +1077,7 @@
             const uniqueAmount = parseFloat(`${base}.${uniqueFraction}`);
             batchRenewState.expectedAmount = uniqueAmount;
 
-            // 把每个用户的续费月数持久化到订单（供服务端 verify-renewal 校验+发放）
+            // 把每个用户的续费月数持久化到订单（供服务端 admin_settle_order / 定时任务校验+发放）
             const batchItems = Object.entries(batchRenewState.selections)
                 .map(([uid, m]) => ({ user_id: parseInt(uid), months: parseInt(m) }))
                 .filter(it => it.user_id && it.months > 0);
@@ -1126,9 +1126,10 @@
         async function checkBatchTronPayment() {
             if (!batchRenewState.orderId) return;
             try {
-                // 安全改造：链上校验 + 批量到期写入全部由服务端 verify-renewal 完成
-                const { data, error } = await sbClient.functions.invoke('verify-renewal', {
-                    body: { order_id: batchRenewState.orderId }
+                // 链上校验 + 批量到期写入由服务端 RPC admin_settle_order 完成（数据库 http 直连 TronGrid，
+                // 与单个续费同一条可靠通道；后台每分钟定时任务同样兜底自动到账）。
+                const { data, error } = await sbClient.rpc('admin_settle_order', {
+                    p_order_id: batchRenewState.orderId
                 });
                 if (error) {
                     const box = document.getElementById('batch-detect-status-box');
@@ -1159,7 +1160,7 @@
             if (batchRenewState.detectTimer) clearInterval(batchRenewState.detectTimer);
             batchRenewState.detectTimer = null;
 
-            // 所有账户的到期时间已由服务端 verify-renewal 写入，这里只负责展示。
+            // 所有账户的到期时间已由服务端 admin_settle_order / 定时任务写入，这里只负责展示。
             document.getElementById('batch-detect-status-box').className = 'detect-status detect-success';
             document.getElementById('batch-detect-status-box').innerHTML = '✅ 付款已确认，所有账户时间已发放';
 
