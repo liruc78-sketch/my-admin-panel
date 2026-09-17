@@ -232,16 +232,21 @@
                 <!-- 步骤1：选月数 -->
                 <div id="renew-step1">
                     <div style="font-size:13px; color:#888; margin-bottom:15px;">当前到期：<span id="renew-current-expiry" style="color:#fdcb6e;"></span></div>
+                    <div style="font-size:13px; color:#ccc; margin-bottom:8px; font-weight:bold;">选择版本</div>
+                    <div class="month-selector" id="version-selector" style="margin-bottom:16px;">
+                        <div class="month-btn" data-version="advanced" onclick="selectVersion('advanced',this)">高级版<div class="price" id="ver-price-advanced">--</div></div>
+                        <div class="month-btn" data-version="normal" onclick="selectVersion('normal',this)">普通版<div class="price" id="ver-price-normal">--</div></div>
+                    </div>
                     <div style="font-size:13px; color:#ccc; margin-bottom:12px; font-weight:bold;">选择续费月数</div>
                     <div class="month-selector" id="month-selector">
-                        <div class="month-btn" data-months="1" onclick="selectMonths(1,this)">1 个月<div class="price">$30</div></div>
-                        <div class="month-btn" data-months="2" onclick="selectMonths(2,this)">2 个月<div class="price">$60</div></div>
-                        <div class="month-btn" data-months="3" onclick="selectMonths(3,this)">3 个月<div class="price">$90</div></div>
-                        <div class="month-btn" data-months="6" onclick="selectMonths(6,this)">6 个月<div class="price">$180</div></div>
+                        <div class="month-btn" data-months="1" onclick="selectMonths(1,this)">1 个月<div class="price">--</div></div>
+                        <div class="month-btn" data-months="2" onclick="selectMonths(2,this)">2 个月<div class="price">--</div></div>
+                        <div class="month-btn" data-months="3" onclick="selectMonths(3,this)">3 个月<div class="price">--</div></div>
+                        <div class="month-btn" data-months="6" onclick="selectMonths(6,this)">6 个月<div class="price">--</div></div>
                     </div>
                     <div style="background:rgba(38,161,123,0.08); border:1px solid rgba(38,161,123,0.2); border-radius:8px; padding:10px 14px; margin-bottom:18px; font-size:12px; color:#888; line-height:1.7;">
                         💡 支付方式：<span style="color:#26a17b; font-weight:bold;">USDT / TRC20</span><br>
-                        每月价格：<span style="color:#fff;">$30.00 USD</span>，支付完成后系统自动检测到账并续期。
+                        每月单价：<span style="color:#fff;" id="renew-unit-price">--</span>，应付 = 单价 × 月数，支付完成后系统自动检测到账并续期。
                     </div>
                     <button class="renew-confirm-btn" id="renew-next-btn" onclick="goToPayStep()" disabled>生成付款订单 →</button>
                 </div>
@@ -288,6 +293,11 @@
                 <div id="batch-renew-step1">
                     <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
                         <input type="text" id="batch-search" class="form-input" placeholder="搜索用户..." style="width: 100%;" oninput="renderBatchUserList()">
+                    </div>
+                    <div style="font-size:13px; color:#ccc; margin-bottom:8px; font-weight:bold;">选择版本（应用于本批全部用户）</div>
+                    <div class="month-selector" id="batch-version-selector" style="margin-bottom:16px;">
+                        <div class="month-btn" data-version="advanced" onclick="selectBatchVersion('advanced',this)">高级版<div class="price" id="batch-ver-price-advanced">--</div></div>
+                        <div class="month-btn" data-version="normal" onclick="selectBatchVersion('normal',this)">普通版<div class="price" id="batch-ver-price-normal">--</div></div>
                     </div>
                     <div id="batch-user-list" style="max-height: 350px; overflow-y: auto; background: #121217; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
                         <!-- 用户列表将在这里渲染 -->
@@ -348,10 +358,15 @@
             <div class="page-title">管理员控制台</div>
             <div class="settings-content-area" style="padding:0; height: 100%;">
                 <div id="admin-tab-users" class="setting-panel active">
-                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
                         <input type="text" id="admin-search" class="form-input" placeholder="搜索用户..." style="width: 200px;">
                         <button class="btn btn-normal" onclick="loadAdminData()">刷新列表</button>
                         <button class="btn btn-import" style="background: #26a17b;" onclick="openBatchRenewModal()">批量续费</button>
+                        <div id="sub-price-box" style="margin-left:auto; display:flex; gap:18px; align-items:center; padding:8px 16px; background:#14141e; border:1px solid #2a2a31; border-radius:8px; font-size:13px;">
+                            <span style="color:#636e72;">我的价格</span>
+                            <span style="color:#b2bec3;">高级版 <b id="sub-price-adv" style="color:#00d2d3;">-</b></span>
+                            <span style="color:#b2bec3;">普通版 <b id="sub-price-normal" style="color:#00b894;">-</b></span>
+                        </div>
                     </div>
                     <div id="admin-table-container" style="overflow-y: auto; flex: 1;">
                         <table class="admin-table">
@@ -593,7 +608,14 @@
 
         async function loadAdminData() {
             if (!currentUser || !currentUser.is_admin) return;
-            
+
+            // 我的价格(由主管理为本次级设定·USDT/月·续费按【价格×月数】收款；随每次登录/会话恢复刷新)
+            const _advEl = document.getElementById('sub-price-adv');
+            const _normEl = document.getElementById('sub-price-normal');
+            const _fp = (raw) => { const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.]/g, '')); return (isFinite(n) && n > 0) ? (n + ' USDT/月') : '未设置'; };
+            if (_advEl) _advEl.textContent = _fp(currentUser.sub_price_advanced);
+            if (_normEl) _normEl.textContent = _fp(currentUser.sub_price_normal);
+
             const tbody = document.getElementById('admin-user-list');
             const container = document.getElementById('admin-table-container');
             const scrollPos = container ? container.scrollTop : 0; // 记录当前滚动位置
@@ -825,6 +847,14 @@
             document.getElementById('renew-next-btn').disabled = true;
             document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('selected'));
 
+            // 版本重置 + 展示我的两个单价；月数按钮金额归位为 --（选版本后再算）
+            renewState.selectedVersion = null;
+            renewState.unitPrice = null;
+            const _va = document.getElementById('ver-price-advanced'); if (_va) _va.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_advanced);
+            const _vn = document.getElementById('ver-price-normal'); if (_vn) _vn.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_normal);
+            document.querySelectorAll('#month-selector .month-btn .price').forEach(p => p.textContent = '--');
+            const _uh = document.getElementById('renew-unit-price'); if (_uh) _uh.textContent = '--';
+
             document.getElementById('renew-overlay').style.display = 'flex';
         }
 
@@ -844,11 +874,54 @@
             imgEl.style.display = 'block';
         }
 
+        // ══════ 版本价格(高级版/普通版) → 续费单价(USDT/月)：取当前次级管理员自己的价格 ══════
+        function _subUnitPrice(version) {
+            const raw = version === 'advanced' ? (currentUser && currentUser.sub_price_advanced) : (currentUser && currentUser.sub_price_normal);
+            const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.]/g, ''));
+            return (isFinite(n) && n > 0) ? n : null;   // 未设置/非法 → null（阻止续费）
+        }
+        function _fmtUnitPrice(raw) {
+            const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.]/g, ''));
+            return (isFinite(n) && n > 0) ? (n + ' USDT/月') : '未设置';
+        }
+        function _money(n) { return (Math.round(n * 1000) / 1000).toString(); }
+        // base(可含小数) + 唯一尾数(1..998 毫U) → 精确到 3 位的唯一应付额（旧字符串拼接遇小数会坏）
+        function _uniqueAmount(base) {
+            return Math.round(base * 1000 + (Math.floor(Math.random() * 998) + 1)) / 1000;
+        }
+        // 单笔续费：选版本(高级版/普通版) → 定单价 → 刷新各月数按钮金额
+        function selectVersion(version, el) {
+            const up = _subUnitPrice(version);
+            if (up == null) { showCustomAlert('该版本价格未设置，请联系主管理设置价格后再续费。'); return; }
+            renewState.selectedVersion = version;
+            renewState.unitPrice = up;
+            document.querySelectorAll('#version-selector .month-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
+            document.querySelectorAll('#month-selector .month-btn').forEach(b => {
+                const m = parseInt(b.dataset.months) || 0;
+                const pe = b.querySelector('.price');
+                if (pe) pe.textContent = _money(m * up) + ' USDT';
+            });
+            const uh = document.getElementById('renew-unit-price');
+            if (uh) uh.textContent = _money(up) + ' USDT';
+            document.getElementById('renew-next-btn').disabled = !(renewState.selectedVersion && renewState.selectedMonths);
+        }
+        // 批量续费：选版本(应用于本批全部用户)
+        function selectBatchVersion(version, el) {
+            const up = _subUnitPrice(version);
+            if (up == null) { showCustomAlert('该版本价格未设置，请联系主管理设置价格后再续费。'); return; }
+            batchRenewState.selectedVersion = version;
+            batchRenewState.unitPrice = up;
+            document.querySelectorAll('#batch-version-selector .month-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
+            updateBatchTotal();
+        }
+
         function selectMonths(months, el) {
             renewState.selectedMonths = months;
-            document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('selected'));
+            document.querySelectorAll('#month-selector .month-btn').forEach(b => b.classList.remove('selected'));
             el.classList.add('selected');
-            document.getElementById('renew-next-btn').disabled = false;
+            document.getElementById('renew-next-btn').disabled = !(renewState.selectedVersion && renewState.selectedMonths);
         }
 
         async function goToPayStep() {
@@ -860,9 +933,9 @@
 
             renewState.payAddress = cfg.pay_usdt_addr;
 
-            const base = months * 30;
-            const uniqueFraction = (Math.floor(Math.random() * 998) + 1).toString().padStart(3, '0');
-            const uniqueAmount = parseFloat(`${base}.${uniqueFraction}`);
+            if (!renewState.unitPrice || renewState.unitPrice <= 0) return showCustomAlert('请先选择版本（高级版/普通版）。');
+            const base = months * renewState.unitPrice;
+            const uniqueAmount = _uniqueAmount(base);
             renewState.expectedAmount = uniqueAmount;
 
             const { data: order, error } = await sbClient.from('renewal_orders').insert({
@@ -991,7 +1064,12 @@
             batchRenewState.users = users || [];
             batchRenewState.selections = {};
             batchRenewState.orderId = null;
+            batchRenewState.selectedVersion = null;
+            batchRenewState.unitPrice = null;
             document.getElementById('batch-search').value = '';
+            const _bva = document.getElementById('batch-ver-price-advanced'); if (_bva) _bva.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_advanced);
+            const _bvn = document.getElementById('batch-ver-price-normal'); if (_bvn) _bvn.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_normal);
+            document.querySelectorAll('#batch-version-selector .month-btn').forEach(b => b.classList.remove('selected'));
 
             document.getElementById('batch-renew-step1').style.display = 'block';
             document.getElementById('batch-renew-step2').style.display = 'none';
@@ -1027,10 +1105,10 @@
                     <div>
                         <select class="batch-month-select" onchange="updateBatchSelection(${u.id}, this.value)">
                             <option value="0" ${currentMonths==0?'selected':''}>不续费</option>
-                            <option value="1" ${currentMonths==1?'selected':''}>1 个月 ($30)</option>
-                            <option value="2" ${currentMonths==2?'selected':''}>2 个月 ($60)</option>
-                            <option value="3" ${currentMonths==3?'selected':''}>3 个月 ($90)</option>
-                            <option value="6" ${currentMonths==6?'selected':''}>6 个月 ($180)</option>
+                            <option value="1" ${currentMonths==1?'selected':''}>1 个月</option>
+                            <option value="2" ${currentMonths==2?'selected':''}>2 个月</option>
+                            <option value="3" ${currentMonths==3?'selected':''}>3 个月</option>
+                            <option value="6" ${currentMonths==6?'selected':''}>6 个月</option>
                         </select>
                     </div>
                 `;
@@ -1055,8 +1133,9 @@
                 totalMonths += batchRenewState.selections[uid];
             }
             document.getElementById('batch-total-months').textContent = totalMonths;
-            document.getElementById('batch-total-price').textContent = '$' + (totalMonths * 30);
-            document.getElementById('batch-renew-next-btn').disabled = totalMonths === 0;
+            const up = batchRenewState.unitPrice;
+            document.getElementById('batch-total-price').textContent = (up && up > 0) ? (_money(totalMonths * up) + ' USDT') : '--';
+            document.getElementById('batch-renew-next-btn').disabled = (totalMonths === 0 || !batchRenewState.unitPrice);
         }
 
         async function goToBatchPayStep() {
@@ -1072,9 +1151,9 @@
             if (!cfg || !cfg.pay_usdt_addr) return showCustomAlert("⚠️ 管理员尚未设置收款地址，请先在「收款设置」中配置。");
 
             batchRenewState.payAddress = cfg.pay_usdt_addr;
-            const base = totalMonths * 30;
-            const uniqueFraction = (Math.floor(Math.random() * 998) + 1).toString().padStart(3, '0');
-            const uniqueAmount = parseFloat(`${base}.${uniqueFraction}`);
+            if (!batchRenewState.unitPrice || batchRenewState.unitPrice <= 0) return showCustomAlert('请先选择版本（高级版/普通版）。');
+            const base = totalMonths * batchRenewState.unitPrice;
+            const uniqueAmount = _uniqueAmount(base);
             batchRenewState.expectedAmount = uniqueAmount;
 
             // 把每个用户的续费月数持久化到订单（供服务端 admin_settle_order / 定时任务校验+发放）
