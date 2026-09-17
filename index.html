@@ -945,6 +945,7 @@
                 amount_usdt: uniqueAmount,
                 to_address: renewState.payAddress,
                 status: 'pending',
+                grant_name_mode: renewState.selectedVersion === 'advanced',   // 高级版 → 结算时自动开通高级模式
                 operator_id: (currentUser && currentUser.id) || null,
                 operator_name: (currentUser && currentUser.username) || null
             }).select().single();
@@ -1169,6 +1170,7 @@
                 amount_usdt: uniqueAmount,
                 to_address: batchRenewState.payAddress,
                 status: 'pending',
+                grant_name_mode: batchRenewState.selectedVersion === 'advanced',   // 高级版 → 结算时整批自动开通高级模式
                 batch_items: batchItems,
                 operator_id: (currentUser && currentUser.id) || null,
                 operator_name: (currentUser && currentUser.username) || null
