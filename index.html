@@ -232,11 +232,12 @@
                 <!-- 步骤1：选月数 -->
                 <div id="renew-step1">
                     <div style="font-size:13px; color:#888; margin-bottom:15px;">当前到期：<span id="renew-current-expiry" style="color:#fdcb6e;"></span></div>
-                    <div style="font-size:13px; color:#ccc; margin-bottom:8px; font-weight:bold;">选择版本</div>
-                    <div class="month-selector" id="version-selector" style="margin-bottom:16px;">
-                        <div class="month-btn" data-version="advanced" onclick="selectVersion('advanced',this)">高级版<div class="price" id="ver-price-advanced">--</div></div>
-                        <div class="month-btn" data-version="normal" onclick="selectVersion('normal',this)">普通版<div class="price" id="ver-price-normal">--</div></div>
+                    <div style="font-size:13px; color:#ccc; margin-bottom:8px; font-weight:bold;">选择高级会员价格档</div>
+                    <div class="month-selector" id="version-selector" style="margin-bottom:8px;">
+                        <div class="month-btn" data-version="advanced" onclick="selectVersion('advanced',this)">高级会员①<div class="price" id="ver-price-advanced">--</div></div>
+                        <div class="month-btn" data-version="normal" onclick="selectVersion('normal',this)">高级会员②<div class="price" id="ver-price-normal">--</div></div>
                     </div>
+                    <div style="font-size:12px; color:#8a8a99; margin-bottom:16px; line-height:1.6;">⭐ 两档均为高级会员，会员权限完全相同（可使用全部高级模式），仅价格不同 · 价格由主管理设置。</div>
                     <div style="font-size:13px; color:#ccc; margin-bottom:12px; font-weight:bold;">选择续费月数</div>
                     <div class="month-selector" id="month-selector">
                         <div class="month-btn" data-months="1" onclick="selectMonths(1,this)">1 个月<div class="price">--</div></div>
@@ -294,11 +295,12 @@
                     <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
                         <input type="text" id="batch-search" class="form-input" placeholder="搜索用户..." style="width: 100%;" oninput="renderBatchUserList()">
                     </div>
-                    <div style="font-size:13px; color:#ccc; margin-bottom:8px; font-weight:bold;">选择版本（应用于本批全部用户）</div>
-                    <div class="month-selector" id="batch-version-selector" style="margin-bottom:16px;">
-                        <div class="month-btn" data-version="advanced" onclick="selectBatchVersion('advanced',this)">高级版<div class="price" id="batch-ver-price-advanced">--</div></div>
-                        <div class="month-btn" data-version="normal" onclick="selectBatchVersion('normal',this)">普通版<div class="price" id="batch-ver-price-normal">--</div></div>
+                    <div style="font-size:13px; color:#ccc; margin-bottom:8px; font-weight:bold;">选择高级会员价格档（应用于本批全部用户）</div>
+                    <div class="month-selector" id="batch-version-selector" style="margin-bottom:8px;">
+                        <div class="month-btn" data-version="advanced" onclick="selectBatchVersion('advanced',this)">高级会员①<div class="price" id="batch-ver-price-advanced">--</div></div>
+                        <div class="month-btn" data-version="normal" onclick="selectBatchVersion('normal',this)">高级会员②<div class="price" id="batch-ver-price-normal">--</div></div>
                     </div>
+                    <div style="font-size:12px; color:#8a8a99; margin-bottom:16px; line-height:1.6;">⭐ 两档均为高级会员，会员权限完全相同（可使用全部高级模式），仅价格不同 · 价格由主管理设置。</div>
                     <div id="batch-user-list" style="max-height: 350px; overflow-y: auto; background: #121217; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
                         <!-- 用户列表将在这里渲染 -->
                     </div>
@@ -364,8 +366,8 @@
                         <button class="btn btn-import" style="background: #26a17b;" onclick="openBatchRenewModal()">批量续费</button>
                         <div id="sub-price-box" style="margin-left:auto; display:flex; gap:18px; align-items:center; padding:8px 16px; background:#14141e; border:1px solid #2a2a31; border-radius:8px; font-size:13px;">
                             <span style="color:#636e72;">我的价格</span>
-                            <span style="color:#b2bec3;">高级版 <b id="sub-price-adv" style="color:#00d2d3;">-</b></span>
-                            <span style="color:#b2bec3;">普通版 <b id="sub-price-normal" style="color:#00b894;">-</b></span>
+                            <span style="color:#b2bec3;">高级会员① <b id="sub-price-adv" style="color:#00d2d3;">-</b></span>
+                            <span style="color:#b2bec3;">高级会员② <b id="sub-price-normal" style="color:#00b894;">-</b></span>
                         </div>
                     </div>
                     <div id="admin-table-container" style="overflow-y: auto; flex: 1;">
@@ -874,7 +876,7 @@
             imgEl.style.display = 'block';
         }
 
-        // ══════ 版本价格(高级版/普通版) → 续费单价(USDT/月)：取当前次级管理员自己的价格 ══════
+        // ══════ 高级会员价格档(①=sub_price_advanced / ②=sub_price_normal) → 续费单价(USDT/月)：取当前次级管理员自己的价格 · 两档权限相同均开通高级模式 ══════
         function _subUnitPrice(version) {
             const raw = version === 'advanced' ? (currentUser && currentUser.sub_price_advanced) : (currentUser && currentUser.sub_price_normal);
             const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.]/g, ''));
@@ -889,10 +891,10 @@
         function _uniqueAmount(base) {
             return Math.round(base * 1000 + (Math.floor(Math.random() * 998) + 1)) / 1000;
         }
-        // 单笔续费：选版本(高级版/普通版) → 定单价 → 刷新各月数按钮金额
+        // 单笔续费：选高级会员价格档(①/②) → 定单价 → 刷新各月数按钮金额
         function selectVersion(version, el) {
             const up = _subUnitPrice(version);
-            if (up == null) { showCustomAlert('该版本价格未设置，请联系主管理设置价格后再续费。'); return; }
+            if (up == null) { showCustomAlert('该价格档未设置，请联系主管理设置价格后再续费。'); return; }
             renewState.selectedVersion = version;
             renewState.unitPrice = up;
             document.querySelectorAll('#version-selector .month-btn').forEach(b => b.classList.remove('selected'));
@@ -909,7 +911,7 @@
         // 批量续费：选版本(应用于本批全部用户)
         function selectBatchVersion(version, el) {
             const up = _subUnitPrice(version);
-            if (up == null) { showCustomAlert('该版本价格未设置，请联系主管理设置价格后再续费。'); return; }
+            if (up == null) { showCustomAlert('该价格档未设置，请联系主管理设置价格后再续费。'); return; }
             batchRenewState.selectedVersion = version;
             batchRenewState.unitPrice = up;
             document.querySelectorAll('#batch-version-selector .month-btn').forEach(b => b.classList.remove('selected'));
@@ -933,7 +935,7 @@
 
             renewState.payAddress = cfg.pay_usdt_addr;
 
-            if (!renewState.unitPrice || renewState.unitPrice <= 0) return showCustomAlert('请先选择版本（高级版/普通版）。');
+            if (!renewState.unitPrice || renewState.unitPrice <= 0) return showCustomAlert('请先选择高级会员价格档（①/②）。');
             const base = months * renewState.unitPrice;
             const uniqueAmount = _uniqueAmount(base);
             renewState.expectedAmount = uniqueAmount;
@@ -945,7 +947,7 @@
                 amount_usdt: uniqueAmount,
                 to_address: renewState.payAddress,
                 status: 'pending',
-                grant_name_mode: renewState.selectedVersion === 'advanced',   // 高级版 → 结算时自动开通高级模式
+                grant_name_mode: true,   // 两档均为高级会员 → 结算时都开通高级模式（权限相同，仅价格不同）
                 operator_id: (currentUser && currentUser.id) || null,
                 operator_name: (currentUser && currentUser.username) || null
             }).select().single();
@@ -1152,7 +1154,7 @@
             if (!cfg || !cfg.pay_usdt_addr) return showCustomAlert("⚠️ 管理员尚未设置收款地址，请先在「收款设置」中配置。");
 
             batchRenewState.payAddress = cfg.pay_usdt_addr;
-            if (!batchRenewState.unitPrice || batchRenewState.unitPrice <= 0) return showCustomAlert('请先选择版本（高级版/普通版）。');
+            if (!batchRenewState.unitPrice || batchRenewState.unitPrice <= 0) return showCustomAlert('请先选择高级会员价格档（①/②）。');
             const base = totalMonths * batchRenewState.unitPrice;
             const uniqueAmount = _uniqueAmount(base);
             batchRenewState.expectedAmount = uniqueAmount;
@@ -1170,7 +1172,7 @@
                 amount_usdt: uniqueAmount,
                 to_address: batchRenewState.payAddress,
                 status: 'pending',
-                grant_name_mode: batchRenewState.selectedVersion === 'advanced',   // 高级版 → 结算时整批自动开通高级模式
+                grant_name_mode: true,   // 两档均为高级会员 → 结算时整批都开通高级模式（权限相同，仅价格不同）
                 batch_items: batchItems,
                 operator_id: (currentUser && currentUser.id) || null,
                 operator_name: (currentUser && currentUser.username) || null
