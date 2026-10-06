@@ -345,6 +345,75 @@
         </div>
     </div>
 
+    <!-- ===== 批量生成账户弹窗（次级：仅开账户，不含任何会员/到期设置） ===== -->
+    <div id="batch-create-overlay" class="renew-overlay" style="display:none;" onclick="if(event.target===this)closeBatchCreateModal()">
+        <div class="renew-card" style="width: 560px;">
+            <div class="renew-header">
+                <h3>批量生成账户</h3>
+                <button class="renew-close" onclick="closeBatchCreateModal()">×</button>
+            </div>
+            <div class="renew-body">
+                <!-- 步骤1：表单 -->
+                <div id="batch-create-form">
+                    <!-- 生成方式 -->
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label>账户生成方式</label>
+                        <div class="month-selector" style="margin-bottom:0;">
+                            <div class="month-btn selected" onclick="setBcGenMode('random', this)">🎲 随机账号</div>
+                            <div class="month-btn" onclick="setBcGenMode('prefix', this)">🔤 前缀 + 编号</div>
+                        </div>
+                    </div>
+                    <!-- 前缀模式字段（随机模式隐藏） -->
+                    <div id="bc-prefix-fields" style="display:none;">
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label>账户开头（前缀）</label>
+                            <input type="text" id="bc-prefix" class="form-input" placeholder="例如：vip，将生成 vip1、vip2 …" oninput="updateBatchCreatePreview()">
+                        </div>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label>起始编号</label>
+                            <input type="number" id="bc-start" class="form-input" value="1" min="0" oninput="updateBatchCreatePreview()">
+                        </div>
+                    </div>
+                    <!-- 数量 -->
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label>生成数量</label>
+                        <input type="number" id="bc-count" class="form-input" value="10" min="1" max="200" oninput="updateBatchCreatePreview()">
+                    </div>
+                    <!-- 密码方式 -->
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label>密码方式</label>
+                        <div class="month-selector" style="margin-bottom:8px;">
+                            <div class="month-btn selected" onclick="setBcPwMode('random', this)">🎲 每个随机密码</div>
+                            <div class="month-btn" onclick="setBcPwMode('unified', this)">🔑 统一密码</div>
+                        </div>
+                        <input type="text" id="bc-password" class="form-input" placeholder="统一密码（至少 6 位）" style="display:none;">
+                    </div>
+                    <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px; cursor:pointer; color:#b2bec3; font-size:13px;">
+                        <input type="checkbox" id="bc-approve" checked style="width:16px; height:16px; accent-color:#26a17b; cursor:pointer;">
+                        生成后直接启用（账户可立即登录）
+                    </label>
+                    <div style="background:rgba(108,92,231,0.08); border:1px solid rgba(108,92,231,0.25); border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:12px; color:#888; line-height:1.7;">
+                        预览：<span id="bc-preview" style="color:#a29bfe;">—</span><br>
+                        <span style="color:#9aa4ad;">ℹ️ 仅创建账户，<b style="color:#ff8a5c;">不含任何会员时长</b>。新账户登录后需续费开通会员。生成的账户会自动归入你的用户列表，可在列表中续费。</span><br>
+                        <span style="color:#666;">提示：数量较大时可能触发注册频率限制，失败的账户会在结果中列出，可稍后重试。</span>
+                    </div>
+                    <div id="bc-progress" style="display:none; text-align:center; color:#fdcb6e; font-size:13px; margin-bottom:12px;"></div>
+                    <button class="renew-confirm-btn" id="bc-submit-btn" style="background:#6c5ce7;" onclick="handleBatchCreate()">开始生成</button>
+                </div>
+                <!-- 步骤2：结果 -->
+                <div id="batch-create-result" style="display:none;">
+                    <div id="bc-result-summary" style="margin-bottom:15px;"></div>
+                    <div style="font-size:12px; color:#a0a0b0; margin-bottom:8px;">📋 下方为「账号↵密码↵空行」格式，可点下方绿色按钮一键复制，或直接在框内选中后 Ctrl+C：</div>
+                    <div id="bc-result-list" style="max-height:300px; overflow-y:auto; background:#0d0d14; border:1px solid #333; border-radius:8px; padding:12px; font-family:monospace; font-size:12px; color:#ccc; white-space:pre-wrap; word-break:break-all; margin-bottom:15px; user-select:text; -webkit-user-select:text; cursor:text;"></div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="renew-confirm-btn" style="flex:2;" onclick="copyBatchCreateResults()">📋 一键复制全部账号密码</button>
+                        <button class="btn btn-normal" style="flex:1;" onclick="closeBatchCreateModal(); loadAdminData();">完成</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="sidebar">
         <div class="sidebar-logo">管理员后台</div>
         <div class="nav-item active" onclick="switchAdminTab('admin-tab-users', this)">
@@ -363,6 +432,7 @@
                     <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
                         <input type="text" id="admin-search" class="form-input" placeholder="搜索用户..." style="width: 200px;">
                         <button class="btn btn-normal" onclick="loadAdminData()">刷新列表</button>
+                        <button class="btn btn-import" style="background: #6c5ce7;" onclick="openBatchCreateModal()">批量生成</button>
                         <button class="btn btn-import" style="background: #26a17b;" onclick="openBatchRenewModal()">批量续费</button>
                         <div id="sub-price-box" style="margin-left:auto; display:flex; gap:18px; align-items:center; padding:8px 16px; background:#14141e; border:1px solid #2a2a31; border-radius:8px; font-size:13px;">
                             <span style="color:#636e72;">我的价格</span>
@@ -1260,6 +1330,283 @@
             `;
             document.body.appendChild(successOverlay);
         }
+
+        // ============================================================
+        // 👥 批量生成账户（次级管理员版）
+        // ------------------------------------------------------------
+        // 🔒 与超管版的关键区别：只能「开账户」，没有任何会员类型 / 到期日期控件。
+        //    账户创建一律不含会员（expiry_date / name_mode 全空），需后续续费开通。
+        //    次级无法直接 INSERT users / 写 visibility（受 RLS 限制），
+        //    故走服务端 SECURITY DEFINER 函数 sub_admin_create_account：
+        //      · 服务端强制不授予任何会员时长（从源头杜绝改会员日期）
+        //      · 自动把新账户纳入本次级的可见范围，便于后续管理/续费
+        // ============================================================
+        // 独立注册客户端：persistSession:false → 不写 localStorage，绝不影响当前管理员登录态
+        let sbSignupClient = null;
+        function getSignupClient() {
+            if (!sbSignupClient) {
+                sbSignupClient = supabase.createClient(SB_URL, SB_KEY, {
+                    auth: { persistSession: false, autoRefreshToken: false, storageKey: 'bc-signup-temp-ciji' },
+                    realtime: { params: { eventsPerSecond: 0 } }
+                });
+            }
+            return sbSignupClient;
+        }
+
+        let bcLastResults = [];     // 最近一次成功生成的账户，供复制
+        let bcGenMode = 'random';   // 'random' | 'prefix'
+        let bcPwMode  = 'random';   // 'random' | 'unified'
+        let bcLastRunInfo = '';     // 结果页顶部本次配置摘要
+
+        const BC_NAME_CHARS = 'abcdefghijkmnpqrstuvwxyz23456789';                         // 去掉 l/o/0/1 等易混字符
+        const BC_PW_CHARS   = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+        function bcRand(chars, n) { let s = ''; for (let i = 0; i < n; i++) s += chars[Math.floor(Math.random() * chars.length)]; return s; }
+        function bcGenUsername() { return bcRand(BC_NAME_CHARS, 8); }
+        function bcGenPassword() { return bcRand(BC_PW_CHARS, 10); }
+
+        function bcSelectSegment(el) {
+            const grp = el.parentElement;
+            grp.querySelectorAll('.month-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+        function setBcGenMode(m, el) {
+            bcGenMode = m; bcSelectSegment(el);
+            document.getElementById('bc-prefix-fields').style.display = (m === 'prefix') ? 'block' : 'none';
+            updateBatchCreatePreview();
+        }
+        function setBcPwMode(m, el) {
+            bcPwMode = m; bcSelectSegment(el);
+            document.getElementById('bc-password').style.display = (m === 'unified') ? 'block' : 'none';
+        }
+        window.setBcGenMode = setBcGenMode; window.setBcPwMode = setBcPwMode;
+
+        function bcGetCount() {
+            const c = parseInt(document.getElementById('bc-count').value, 10);
+            return (isNaN(c) || c < 1) ? 0 : c;
+        }
+        function buildBatchUsernames() {
+            const prefix = document.getElementById('bc-prefix').value.trim();
+            const start = parseInt(document.getElementById('bc-start').value, 10);
+            const count = bcGetCount();
+            const names = [];
+            if (prefix && !isNaN(start) && count >= 1) {
+                for (let i = 0; i < count; i++) names.push(prefix + (start + i));
+            }
+            return { prefix, start, count, names };
+        }
+
+        function updateBatchCreatePreview() {
+            const el = document.getElementById('bc-preview'); if (!el) return;
+            const count = bcGetCount();
+            if (bcGenMode === 'random') {
+                el.textContent = count ? ('随机生成 ' + count + ' 个账户（账号 + 密码均随机，例如 ' + bcGenUsername() + '）') : '请填写生成数量';
+                return;
+            }
+            const { names } = buildBatchUsernames();
+            if (!names.length) { el.textContent = '请填写前缀和数量'; return; }
+            const head = names.slice(0, 3).join('、');
+            const tail = names.length > 3 ? (' … ' + names[names.length - 1]) : '';
+            el.textContent = '共 ' + count + ' 个：' + head + tail;
+        }
+        window.updateBatchCreatePreview = updateBatchCreatePreview;
+
+        function resetBatchCreateForm() {
+            // 复位到默认：随机账号 + 随机密码（每个 .month-selector 的第 0 个按钮）
+            bcGenMode = 'random'; bcPwMode = 'random';
+            document.querySelectorAll('#batch-create-form .month-selector').forEach(grp => {
+                grp.querySelectorAll('.month-btn').forEach((b, i) => b.classList.toggle('selected', i === 0));
+            });
+            document.getElementById('bc-prefix-fields').style.display = 'none';
+            document.getElementById('bc-password').style.display = 'none';
+            document.getElementById('bc-password').value = '';
+            document.getElementById('bc-prefix').value = '';
+            document.getElementById('bc-start').value = '1';
+            document.getElementById('bc-count').value = '10';
+            document.getElementById('bc-approve').checked = true;
+            updateBatchCreatePreview();
+        }
+
+        function openBatchCreateModal() {
+            if (!currentUser || !currentUser.is_admin) return showCustomAlert("权限不足：仅管理员可生成账户");
+            document.getElementById('batch-create-form').style.display = 'block';
+            document.getElementById('batch-create-result').style.display = 'none';
+            document.getElementById('bc-progress').style.display = 'none';
+            const btn = document.getElementById('bc-submit-btn');
+            btn.disabled = false;
+            btn.textContent = '开始生成';
+            resetBatchCreateForm();
+            document.getElementById('batch-create-overlay').style.display = 'flex';
+        }
+        window.openBatchCreateModal = openBatchCreateModal;
+
+        function closeBatchCreateModal() {
+            document.getElementById('batch-create-overlay').style.display = 'none';
+        }
+        window.closeBatchCreateModal = closeBatchCreateModal;
+
+        async function handleBatchCreate() {
+            if (!currentUser || !currentUser.is_admin) return showCustomAlert("权限不足");
+            const count = bcGetCount();
+            if (count < 1) return showCustomAlert("请输入有效的生成数量");
+            if (count > 200) return showCustomAlert("单次最多生成 200 个账户");
+
+            // 用户名清单
+            let names = [];
+            if (bcGenMode === 'prefix') {
+                const built = buildBatchUsernames();
+                if (!built.prefix) return showCustomAlert("请输入账户开头（前缀），或切换为「随机账号」");
+                names = built.names;
+            } else {
+                const seen = new Set();
+                let guard = 0;
+                while (names.length < count && guard < count * 50) {
+                    const u = bcGenUsername(); guard++;
+                    if (!seen.has(u)) { seen.add(u); names.push(u); }
+                }
+            }
+            if (!names.length) return showCustomAlert("未能生成账户清单");
+
+            // 密码
+            const unifiedPassword = document.getElementById('bc-password').value;
+            if (bcPwMode === 'unified' && (!unifiedPassword || unifiedPassword.length < 6)) {
+                return showCustomAlert("统一密码长度至少 6 位");
+            }
+            const approve = document.getElementById('bc-approve').checked;
+            const modeDesc = (bcGenMode === 'random') ? '随机账号' : '前缀编号';
+            const pwDesc = (bcPwMode === 'unified') ? '统一密码' : '随机密码';
+
+            if (!await showCustomConfirm('即将生成 ' + count + ' 个账户（' + modeDesc + ' + ' + pwDesc + '）\n· 仅创建账户，不含任何会员时长\n· 账户将自动归入你的用户列表\n确认继续？')) return;
+
+            const submitBtn = document.getElementById('bc-submit-btn');
+            const progress = document.getElementById('bc-progress');
+            submitBtn.disabled = true;
+            progress.style.display = 'block';
+            progress.textContent = '准备中...';
+
+            const signupClient = getSignupClient();
+            const created = [];   // {username, password}
+            const skipped = [];   // {username, reason}
+            const failed = [];    // {username, reason}
+            let aborted = false;
+
+            for (let i = 0; i < names.length; i++) {
+                const username = names[i];
+                const password = (bcPwMode === 'unified') ? unifiedPassword : bcGenPassword();
+                progress.textContent = '正在生成 ' + (i + 1) + ' / ' + names.length + ' ：' + username;
+
+                try {
+                    const email = toSafeEmail(username);
+                    const { data: signRes, error: signErr } = await signupClient.auth.signUp({ email, password });
+                    if (signErr) {
+                        const msg = (signErr.message || '').toLowerCase();
+                        if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) skipped.push({ username, reason: '账户已存在' });
+                        else if (msg.includes('rate') || msg.includes('limit') || msg.includes('too many')) failed.push({ username, reason: '触发频率限制，请稍后重试' });
+                        else failed.push({ username, reason: signErr.message || '注册失败' });
+                        continue;
+                    }
+                    const authId = signRes && signRes.user && signRes.user.id;
+                    if (!authId) { failed.push({ username, reason: '未返回账户ID' }); continue; }
+
+                    // 服务端建档 + 自动纳入可见范围（绝不设置任何会员/到期）
+                    const { data: rpcRes, error: rpcErr } = await sbClient.rpc('sub_admin_create_account', {
+                        p_username: username, p_auth_id: authId, p_approved: approve
+                    });
+                    if (rpcErr) {
+                        const m = (rpcErr.message || '').toLowerCase();
+                        if (m.includes('already exists') || m.includes('already linked') || m.includes('duplicate')) {
+                            skipped.push({ username, reason: '账户已存在' });
+                        } else if (m.includes('permission') || m.includes('admin only') || m.includes('not authenticated')) {
+                            failed.push({ username, reason: '权限不足，已中止' });
+                            aborted = true; break;   // 权限问题对后续全部无效，直接中止
+                        } else {
+                            failed.push({ username, reason: rpcErr.message || '创建失败' });
+                        }
+                        continue;
+                    }
+
+                    created.push({ username, password });
+                } catch (e) {
+                    failed.push({ username, reason: e.message || '异常' });
+                }
+                await new Promise(r => setTimeout(r, 250));   // 轻微节流，降低频率限制风险
+            }
+
+            bcLastResults = created;
+            bcLastRunInfo = '本次：仅创建账户（不含会员时长）· 共 ' + names.length + ' 个（' + modeDesc + ' + ' + pwDesc + '）' + (aborted ? ' · ⚠️ 因权限不足已中止' : '');
+            renderBatchCreateResult(created, skipped, failed);
+        }
+        window.handleBatchCreate = handleBatchCreate;
+
+        function renderBatchCreateResult(created, skipped, failed) {
+            document.getElementById('batch-create-form').style.display = 'none';
+            document.getElementById('batch-create-result').style.display = 'block';
+
+            document.getElementById('bc-result-summary').innerHTML =
+                (bcLastRunInfo ? ('<div style="font-size:12px; color:#a29bfe; background:rgba(108,92,231,0.08); border:1px solid rgba(108,92,231,0.25); border-radius:8px; padding:8px 12px; margin-bottom:12px;">' + bcLastRunInfo + '</div>') : '') +
+                '<div style="display:flex; gap:10px;">' +
+                    '<div style="flex:1; background:rgba(0,184,148,0.1); border:1px solid rgba(0,184,148,0.3); border-radius:8px; padding:12px; text-align:center;">' +
+                        '<div style="color:#888; font-size:12px;">成功</div>' +
+                        '<div style="color:#00b894; font-size:22px; font-weight:bold;">' + created.length + '</div>' +
+                    '</div>' +
+                    '<div style="flex:1; background:rgba(253,203,110,0.1); border:1px solid rgba(253,203,110,0.3); border-radius:8px; padding:12px; text-align:center;">' +
+                        '<div style="color:#888; font-size:12px;">跳过</div>' +
+                        '<div style="color:#fdcb6e; font-size:22px; font-weight:bold;">' + skipped.length + '</div>' +
+                    '</div>' +
+                    '<div style="flex:1; background:rgba(214,48,49,0.1); border:1px solid rgba(214,48,49,0.3); border-radius:8px; padding:12px; text-align:center;">' +
+                        '<div style="color:#888; font-size:12px;">失败</div>' +
+                        '<div style="color:#d63031; font-size:22px; font-weight:bold;">' + failed.length + '</div>' +
+                    '</div>' +
+                '</div>';
+
+            let lines = '';
+            if (created.length) {
+                lines += '【成功生成（账号换行密码，账户间空行，复制即为此格式）】\n';
+                created.forEach(c => lines += c.username + '\n' + c.password + '\n\n');
+            }
+            if (skipped.length) {
+                lines += (lines ? '\n' : '') + '【已跳过】\n';
+                skipped.forEach(s => lines += s.username + '  (' + s.reason + ')\n');
+            }
+            if (failed.length) {
+                lines += (lines ? '\n' : '') + '【失败】\n';
+                failed.forEach(f => lines += f.username + '  (' + f.reason + ')\n');
+            }
+            document.getElementById('bc-result-list').textContent = lines.trim() || '无结果';
+        }
+
+        // 健壮复制：https/localhost 用 navigator.clipboard；file:// 或非安全上下文回退到 execCommand
+        function bcCopyFallback(text) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed'; ta.style.top = '-9999px'; ta.style.left = '-9999px';
+                ta.style.userSelect = 'text'; ta.style.webkitUserSelect = 'text';
+                ta.setAttribute('readonly', '');
+                document.body.appendChild(ta);
+                ta.focus(); ta.select();
+                try { ta.setSelectionRange(0, text.length); } catch (e) {}
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                return ok;
+            } catch (e) { return false; }
+        }
+        async function bcCopyText(text) {
+            try {
+                if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (e) { /* 落到回退 */ }
+            return bcCopyFallback(text);
+        }
+        async function copyBatchCreateResults() {
+            if (!bcLastResults.length) return showCustomAlert("没有可复制的成功账户");
+            const text = bcLastResults.map(c => c.username + '\n' + c.password).join('\n\n');
+            const ok = await bcCopyText(text);
+            if (ok) showCustomAlert('✅ 已复制 ' + bcLastResults.length + ' 个账户（账号换行密码，账户之间空行）');
+            else showCustomAlert('复制未成功。请在上方结果框内选中全部文本后按 Ctrl+C 手动复制。');
+        }
+        window.copyBatchCreateResults = copyBatchCreateResults;
 
     </script>
 </body>
