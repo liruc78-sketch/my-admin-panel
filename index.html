@@ -681,10 +681,9 @@
         window.showCustomConfirm = (msg) => showDialog('confirm', msg);
 
 
-        async function loadAdminData() {
-            if (!currentUser || !currentUser.is_admin) return;
-
-            // 我的价格(由主管理为本次级设定·USDT/月·续费按【价格×月数】收款；随每次登录/会话恢复刷新)
+        // 我的价格(由主管理为本次级设定·USDT/月·续费按【价格×月数】收款；随每次登录/会话恢复/打开续费弹窗刷新)
+        function renderMyPrices() {
+            if (!currentUser) return;
             const _advEl = document.getElementById('sub-price-adv');
             const _normEl = document.getElementById('sub-price-normal');
             const _fp = (raw) => { const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.]/g, '')); return (isFinite(n) && n > 0) ? (n + ' USDT/月') : '未设置'; };
@@ -694,6 +693,12 @@
             const _basicEl = document.getElementById('sub-price-basic');
             if (_basicWrap) _basicWrap.style.display = _basicTierOn() ? '' : 'none';
             if (_basicEl) _basicEl.textContent = _fp(currentUser.sub_price_basic);
+        }
+
+        async function loadAdminData() {
+            if (!currentUser || !currentUser.is_admin) return;
+
+            renderMyPrices();
 
             const tbody = document.getElementById('admin-user-list');
             const container = document.getElementById('admin-table-container');
@@ -912,7 +917,8 @@
             detectTimer: null
         };
 
-        function openRenewModal(uid, uname, expiry) {
+        async function openRenewModal(uid, uname, expiry) {
+            if (!(await _refreshMyPrices())) return showCustomAlert('网络不稳定，暂时无法获取最新续费价格，请稍后再试。');
             renewState.userId = uid;
             renewState.username = uname;
             renewState.currentExpiry = expiry || null;
@@ -959,6 +965,23 @@
         //   advanced=高级会员①(sub_price_advanced) / normal=高级会员②(sub_price_normal)：两档权限相同，均开通高级模式
         //   basic=普通会员(sub_price_basic)：仅主管理为本次级开启(sub_basic_enabled)时显示；只延长账号到期，不续高级
         function _basicTierOn() { return !!(currentUser && currentUser.sub_basic_enabled); }
+        // 续费前从数据库重拉本人价格档：currentUser 只在登录/页面加载时读一次，页面开着(或标签页休眠后唤醒)期间
+        // 主管理改价不会同步，按旧价下单会按旧档位结算(如旧高级价被当成高级单)。读取失败返回 false。
+        async function _refreshMyPrices() {
+            if (!currentUser || !currentUser.id) return false;
+            try {
+                const { data, error } = await sbClient.from('users')
+                    .select('sub_price_advanced, sub_price_normal, sub_price_basic, sub_basic_enabled')
+                    .eq('id', currentUser.id).single();
+                if (error || !data) return false;
+                Object.assign(currentUser, data);
+                try { localStorage.setItem('adminUser', JSON.stringify(currentUser)); } catch (_) {}
+                renderMyPrices();
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
         function applyBasicTierVisibility() {
             const on = _basicTierOn();
             document.querySelectorAll('.basic-tier-btn').forEach(b => { b.style.display = on ? '' : 'none'; });
@@ -1027,6 +1050,13 @@
         async function goToPayStep() {
             const months = renewState.selectedMonths;
             if (!months) return;
+
+            // 下单前再核一次价格：弹窗打开期间主管理改了价 → 重开弹窗按新价重新选
+            if (!(await _refreshMyPrices())) return showCustomAlert('网络不稳定，暂时无法获取最新续费价格，请稍后再试。');
+            if (_subUnitPrice(renewState.selectedVersion) !== renewState.unitPrice) {
+                await showCustomAlert('续费价格已更新，请重新选择续费类型。');
+                return openRenewModal(renewState.userId, renewState.username, renewState.currentExpiry);
+            }
 
             const { data: cfg } = await sbClient.from('app_config').select('pay_usdt_addr, pay_wechat_url').eq('id', 1).single();
             if (!cfg || !cfg.pay_usdt_addr) return showCustomAlert("⚠️ 管理员尚未设置收款地址，请先在「收款设置」中配置。");
@@ -1150,7 +1180,8 @@
 
         async function openBatchRenewModal() {
             if (!currentUser || !currentUser.is_admin) return;
-            
+            if (!(await _refreshMyPrices())) return showCustomAlert('网络不稳定，暂时无法获取最新续费价格，请稍后再试。');
+
             // 获取当前管理员有权限查看的用户
             const { data: visRows } = await sbClient.from('sub_admin_visibility').select('target_user_id').eq('sub_admin_id', currentUser.id);
             const allowedIds = (visRows || []).map(r => r.target_user_id);
@@ -1165,20 +1196,26 @@
             batchRenewState.users = users || [];
             batchRenewState.selections = {};
             batchRenewState.orderId = null;
-            batchRenewState.selectedVersion = null;
-            batchRenewState.unitPrice = null;
             document.getElementById('batch-search').value = '';
-            const _bva = document.getElementById('batch-ver-price-advanced'); if (_bva) _bva.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_advanced);
-            const _bvn = document.getElementById('batch-ver-price-normal'); if (_bvn) _bvn.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_normal);
-            const _bvb = document.getElementById('batch-ver-price-basic'); if (_bvb) _bvb.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_basic);
-            applyBasicTierVisibility();
-            document.querySelectorAll('#batch-version-selector .month-btn').forEach(b => b.classList.remove('selected'));
+            _resetBatchVersion();
 
             document.getElementById('batch-renew-step1').style.display = 'block';
             document.getElementById('batch-renew-step2').style.display = 'none';
             document.getElementById('batch-renew-overlay').style.display = 'flex';
             
             renderBatchUserList();
+        }
+
+        // 批量续费：价格档归位(显示最新单价·清空已选档位·保留已勾选的用户月数)
+        function _resetBatchVersion() {
+            batchRenewState.selectedVersion = null;
+            batchRenewState.unitPrice = null;
+            const _bva = document.getElementById('batch-ver-price-advanced'); if (_bva) _bva.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_advanced);
+            const _bvn = document.getElementById('batch-ver-price-normal'); if (_bvn) _bvn.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_normal);
+            const _bvb = document.getElementById('batch-ver-price-basic'); if (_bvb) _bvb.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_basic);
+            applyBasicTierVisibility();
+            document.querySelectorAll('#batch-version-selector .month-btn').forEach(b => b.classList.remove('selected'));
+            updateBatchTotal();
         }
 
         function closeBatchRenewModal() {
@@ -1249,6 +1286,13 @@
                 selectedUsers.push(uid);
             }
             if (totalMonths === 0) return;
+
+            // 下单前再核一次价格：弹窗打开期间主管理改了价 → 档位归位按新价重新选
+            if (!(await _refreshMyPrices())) return showCustomAlert('网络不稳定，暂时无法获取最新续费价格，请稍后再试。');
+            if (_subUnitPrice(batchRenewState.selectedVersion) !== batchRenewState.unitPrice) {
+                _resetBatchVersion();
+                return showCustomAlert('续费价格已更新，请重新选择续费类型。');
+            }
 
             const { data: cfg } = await sbClient.from('app_config').select('pay_usdt_addr, pay_wechat_url').eq('id', 1).single();
             if (!cfg || !cfg.pay_usdt_addr) return showCustomAlert("⚠️ 管理员尚未设置收款地址，请先在「收款设置」中配置。");
