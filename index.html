@@ -237,6 +237,7 @@
                         <div class="month-btn" data-version="advanced" onclick="selectVersion('advanced',this)">高级会员①<div class="price" id="ver-price-advanced">--</div></div>
                         <div class="month-btn" data-version="normal" onclick="selectVersion('normal',this)">高级会员②<div class="price" id="ver-price-normal">--</div></div>
                         <div class="month-btn basic-tier-btn" data-version="basic" onclick="selectVersion('basic',this)" style="display:none;">普通会员<div class="price" id="ver-price-basic">--</div></div>
+                        <div class="month-btn custom-tier-btn" data-version="custom" onclick="selectVersion('custom',this)" style="display:none;">高山集团定制版<div class="price" id="ver-price-custom">--</div></div>
                     </div>
                     <div style="font-size:12px; color:#8a8a99; margin-bottom:16px; line-height:1.6;" class="renew-tier-note">⭐ 两档均为高级会员，会员权限完全相同（可使用全部高级模式），仅价格不同 · 价格由主管理设置。</div>
                     <div style="font-size:13px; color:#ccc; margin-bottom:12px; font-weight:bold;">选择续费月数</div>
@@ -301,6 +302,7 @@
                         <div class="month-btn" data-version="advanced" onclick="selectBatchVersion('advanced',this)">高级会员①<div class="price" id="batch-ver-price-advanced">--</div></div>
                         <div class="month-btn" data-version="normal" onclick="selectBatchVersion('normal',this)">高级会员②<div class="price" id="batch-ver-price-normal">--</div></div>
                         <div class="month-btn basic-tier-btn" data-version="basic" onclick="selectBatchVersion('basic',this)" style="display:none;">普通会员<div class="price" id="batch-ver-price-basic">--</div></div>
+                        <div class="month-btn custom-tier-btn" data-version="custom" onclick="selectBatchVersion('custom',this)" style="display:none;">高山集团定制版<div class="price" id="batch-ver-price-custom">--</div></div>
                     </div>
                     <div style="font-size:12px; color:#8a8a99; margin-bottom:16px; line-height:1.6;" class="renew-tier-note">⭐ 两档均为高级会员，会员权限完全相同（可使用全部高级模式），仅价格不同 · 价格由主管理设置。</div>
                     <div id="batch-user-list" style="max-height: 350px; overflow-y: auto; background: #121217; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
@@ -441,6 +443,7 @@
                             <span style="color:#b2bec3;">高级会员① <b id="sub-price-adv" style="color:#00d2d3;">-</b></span>
                             <span style="color:#b2bec3;">高级会员② <b id="sub-price-normal" style="color:#00b894;">-</b></span>
                             <span id="sub-price-basic-wrap" style="color:#b2bec3; display:none;">普通会员 <b id="sub-price-basic" style="color:#fdcb6e;">-</b></span>
+                            <span id="sub-price-custom-wrap" style="color:#b2bec3; display:none;">高山集团定制版 <b id="sub-price-custom" style="color:#00cec9;">-</b></span>
                         </div>
                     </div>
                     <div id="admin-table-container" style="overflow-y: auto; flex: 1;">
@@ -681,6 +684,28 @@
         window.showCustomConfirm = (msg) => showDialog('confirm', msg);
 
 
+        // 🆕 2026-11-04 美西(America/Los_Angeles)当前日期 YYYY-MM-DD，与服务端到期判定同基准
+        function usWestToday() {
+            return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+        }
+        // 🆕 2026-11-04 定制版在期(各处同一口径)：custom_visible=true 且 custom_expiry 非空且 >= 美西今天
+        function customTierLive(u, laToday) {
+            return !!(u && u.custom_visible === true && u.custom_expiry && String(u.custom_expiry).slice(0, 10) >= (laToday || usWestToday()));
+        }
+        // 🆕 2026-11-04 用户有定制版到期日或打开了可见开关，才多显示一行定制版到期
+        function _hasCustomData(u) {
+            return !!(u && (u.custom_expiry || u.custom_visible === true));
+        }
+        // 🆕 2026-11-04 定制版到期的显示(未开通/已过期/已隐藏，同 admin.html)。只含日期和固定文字
+        function _customExpiryHtml(u) {
+            const raw = u && u.custom_expiry;
+            if (!raw) return '<span style="color:#636e72;">未开通</span>';
+            const d = new Date(raw);
+            return `${d.getUTCFullYear()}年${String(d.getUTCMonth()+1).padStart(2,'0')}月${String(d.getUTCDate()).padStart(2,'0')}日`
+                + (String(raw).slice(0, 10) < usWestToday() ? ' <span style="color:#e17055;">(已过期)</span>' : '')
+                + (u.custom_visible !== true ? ' <span style="color:#e17055;">(已隐藏)</span>' : '');
+        }
+
         // 我的价格(由主管理为本次级设定·USDT/月·续费按【价格×月数】收款；随每次登录/会话恢复/打开续费弹窗刷新)
         function renderMyPrices() {
             if (!currentUser) return;
@@ -693,7 +718,19 @@
             const _basicEl = document.getElementById('sub-price-basic');
             if (_basicWrap) _basicWrap.style.display = _basicTierOn() ? '' : 'none';
             if (_basicEl) _basicEl.textContent = _fp(currentUser.sub_price_basic);
+            const _customWrap = document.getElementById('sub-price-custom-wrap');
+            const _customEl = document.getElementById('sub-price-custom');
+            if (_customWrap) _customWrap.style.display = _customTierOn() ? '' : 'none';   // 🆕 2026-11-04 设了价才显示
+            if (_customEl) _customEl.textContent = _fp(_customTierOn() && currentUser.sub_price_custom);
+            // 🆕 2026-11-04 四档放不下时整块换到下一行，不把「USDT/月」折成两行；没有定制版价的次级不变
+            const _priceBox = document.getElementById('sub-price-box');
+            if (_priceBox) {
+                _priceBox.style.whiteSpace = _customTierOn() ? 'nowrap' : '';
+                if (_priceBox.parentElement) _priceBox.parentElement.style.flexWrap = _customTierOn() ? 'wrap' : '';
+            }
         }
+
+        const _listedUsers = new Map();   // 🆕 2026-11-04 用户列表最近加载的行(uid → 行)，续费弹窗取到期日用
 
         async function loadAdminData() {
             if (!currentUser || !currentUser.is_admin) return;
@@ -723,7 +760,7 @@
             }
 
             let query = sbClient.from('users')
-                .select('id, username, hwid, is_approved, role, expiry_date, remark')
+                .select('id, username, hwid, is_approved, role, expiry_date, remark, name_mode_expiry, custom_expiry, custom_visible')
                 .in('id', allowedIds)
                 .order('id');
             if (search) query = query.or(`username.ilike.%${search}%,remark.ilike.%${search}%`);
@@ -732,9 +769,11 @@
             if (error) return alert("加载失败");
 
             tbody.innerHTML = '';
+            _listedUsers.clear();
             data.forEach(u => {
                 // ✅ 修复：渲染前对每行数据的 role 做 trim，防止脏数据影响权限判断和显示
                 if (u.role) u.role = u.role.trim();
+                _listedUsers.set(String(u.id), u);
 
                 const tr = document.createElement('tr');
                 const amISuper = currentUser.role === 'super';
@@ -749,7 +788,7 @@
                                 <span style="color:#888; font-size:11px;">${u.remark ? `(${escapeHtml(u.remark)})` : ''}</span>
                                 <button class="edit-remark-btn" data-uid="${u.id}" data-remark="${escapeHtml(u.remark || '')}" data-role="${escapeHtml(u.role)}" style="background:transparent; color:#6c5ce7; font-size:16px; padding:0 5px; cursor:pointer; border:none;">✎</button>
                             </div>
-                            <div style="font-size: 11px; color: #fdcb6e;">到期时间: ${u.expiry_date ? (()=>{ const d=new Date(u.expiry_date); return `${d.getUTCFullYear()}年${String(d.getUTCMonth()+1).padStart(2,'0')}月${String(d.getUTCDate()).padStart(2,'0')}日`; })() : '<span style="color:#888;">未设置</span>'}</div>
+                            <div style="font-size: 11px; color: #fdcb6e;">到期时间: ${u.expiry_date ? (()=>{ const d=new Date(u.expiry_date); return `${d.getUTCFullYear()}年${String(d.getUTCMonth()+1).padStart(2,'0')}月${String(d.getUTCDate()).padStart(2,'0')}日`; })() : '<span style="color:#888;">未设置</span>'}</div>${_hasCustomData(u) ? `<div style="font-size: 11px; color: ${customTierLive(u) ? '#00cec9' : '#636e72'};">定制版到期: ${_customExpiryHtml(u)}</div>` : ''}
                         </div>
                     </td>
                     <td title="${escapeHtml(u.hwid || '')}">${escapeHtml((u.hwid || '').substring(0, 10))}...</td>
@@ -922,6 +961,7 @@
             renewState.userId = uid;
             renewState.username = uname;
             renewState.currentExpiry = expiry || null;
+            renewState.customRow = _listedUsers.get(String(uid)) || { id: parseInt(uid), username: uname };   // 🆕 2026-11-04 目标行：定制版到期显示 + 下单前检查
             renewState.selectedMonths = 0;
             renewState.orderId = null;
 
@@ -929,6 +969,7 @@
             document.getElementById('renew-step2').style.display = 'none';
             document.getElementById('renew-title').textContent = `本德爬虫续费：${uname}`;
             document.getElementById('renew-current-expiry').textContent = expiry ? (()=>{ const d=new Date(expiry); return `${d.getUTCFullYear()}年${String(d.getUTCMonth()+1).padStart(2,'0')}月${String(d.getUTCDate()).padStart(2,'0')}日`; })() : '暂无（永久）';
+            renewState.accountExpiryText = document.getElementById('renew-current-expiry').textContent;   // 🆕 2026-11-04 切回其它档时恢复
             document.getElementById('renew-next-btn').disabled = true;
             document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('selected'));
 
@@ -938,6 +979,7 @@
             const _va = document.getElementById('ver-price-advanced'); if (_va) _va.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_advanced);
             const _vn = document.getElementById('ver-price-normal'); if (_vn) _vn.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_normal);
             const _vb = document.getElementById('ver-price-basic'); if (_vb) _vb.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_basic);
+            const _vc = document.getElementById('ver-price-custom'); if (_vc) _vc.textContent = _fmtUnitPrice(_customTierOn() && currentUser.sub_price_custom);
             applyBasicTierVisibility();
             document.querySelectorAll('#month-selector .month-btn .price').forEach(p => p.textContent = '--');
             const _uh = document.getElementById('renew-unit-price'); if (_uh) _uh.textContent = '--';
@@ -964,14 +1006,16 @@
         // ══════ 续费价格档 → 续费单价(USDT/月)：取当前次级管理员自己的价格 ══════
         //   advanced=高级会员①(sub_price_advanced) / normal=高级会员②(sub_price_normal)：两档权限相同，均开通高级模式
         //   basic=普通会员(sub_price_basic)：仅主管理为本次级开启(sub_basic_enabled)时显示；只延长账号到期，不续高级
+        //   🆕 2026-11-04 custom=高山集团定制版(sub_price_custom)：主管理设了价才显示；只延长定制版到期
         function _basicTierOn() { return !!(currentUser && currentUser.sub_basic_enabled); }
+        function _customTierOn() { return _subUnitPrice('custom') != null; }
         // 续费前从数据库重拉本人价格档：currentUser 只在登录/页面加载时读一次，页面开着(或标签页休眠后唤醒)期间
         // 主管理改价不会同步，按旧价下单会按旧档位结算(如旧高级价被当成高级单)。读取失败返回 false。
         async function _refreshMyPrices() {
             if (!currentUser || !currentUser.id) return false;
             try {
                 const { data, error } = await sbClient.from('users')
-                    .select('sub_price_advanced, sub_price_normal, sub_price_basic, sub_basic_enabled')
+                    .select('sub_price_advanced, sub_price_normal, sub_price_basic, sub_basic_enabled, sub_price_custom')
                     .eq('id', currentUser.id).single();
                 if (error || !data) return false;
                 Object.assign(currentUser, data);
@@ -984,22 +1028,27 @@
         }
         function applyBasicTierVisibility() {
             const on = _basicTierOn();
+            const customOn = _customTierOn();   // 🆕 2026-11-04
             document.querySelectorAll('.basic-tier-btn').forEach(b => { b.style.display = on ? '' : 'none'; });
+            document.querySelectorAll('.custom-tier-btn').forEach(b => { b.style.display = customOn ? '' : 'none'; });
             document.querySelectorAll('.renew-tier-header').forEach(h => {
                 const suffix = h.dataset.batch ? '（应用于本批全部用户）' : '';
-                h.textContent = (on ? '选择续费会员类型' : '选择高级会员价格档') + suffix;
+                h.textContent = ((on || customOn) ? '选择续费会员类型' : '选择高级会员价格档') + suffix;
             });
             document.querySelectorAll('.renew-tier-note').forEach(n => {
                 n.textContent = on
                     ? '⭐ 高级会员①/②权限完全相同（可使用全部高级模式），仅价格不同；普通会员只续账号时间，不续高级模式 · 价格由主管理设置。'
-                    : '⭐ 两档均为高级会员，会员权限完全相同（可使用全部高级模式），仅价格不同 · 价格由主管理设置。';
+                    : (customOn ? '⭐ 高级会员①/②权限完全相同（可使用全部高级模式），仅价格不同 · 价格由主管理设置。' : '⭐ 两档均为高级会员，会员权限完全相同（可使用全部高级模式），仅价格不同 · 价格由主管理设置。');
+                if (customOn) n.textContent += ' 高山集团定制版只能用 Spokeo 与 USA People Search，到期日单独计算。';
             });
         }
         function _subUnitPrice(version) {
             if (version === 'basic' && !_basicTierOn()) return null;
             const raw = version === 'advanced' ? (currentUser && currentUser.sub_price_advanced)
                       : version === 'basic'    ? (currentUser && currentUser.sub_price_basic)
+                      : version === 'custom'   ? (currentUser && currentUser.sub_price_custom)   // 🆕 2026-11-04 未设 → null，绝不落到其它档
                       : (currentUser && currentUser.sub_price_normal);
+            if (version === 'custom' && /[-－−–—]/.test(raw)) return null;   // 🆕 2026-11-04 写成负数也算没设价(下面的解析会去掉负号)，和服务端下单校验同一口径
             const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.]/g, ''));
             return (isFinite(n) && n > 0) ? n : null;   // 未设置/非法 → null（阻止续费）
         }
@@ -1027,14 +1076,19 @@
             });
             const uh = document.getElementById('renew-unit-price');
             if (uh) uh.textContent = _money(up) + ' USDT';
+            // 🆕 2026-11-04 选定制版档时「当前到期」换成定制版到期，切回其它档恢复
+            if (version === 'custom') document.getElementById('renew-current-expiry').innerHTML = '高山集团定制版 · ' + _customExpiryHtml(renewState.customRow);
+            else document.getElementById('renew-current-expiry').textContent = renewState.accountExpiryText;
             document.getElementById('renew-next-btn').disabled = !(renewState.selectedVersion && renewState.selectedMonths);
         }
         // 批量续费：选版本(应用于本批全部用户)
         function selectBatchVersion(version, el) {
             const up = _subUnitPrice(version);
             if (up == null) { showCustomAlert('该价格档未设置，请联系主管理设置价格后再续费。'); return; }
+            const wasCustom = batchRenewState.selectedVersion === 'custom';   // 🆕 2026-11-04
             batchRenewState.selectedVersion = version;
             batchRenewState.unitPrice = up;
+            if (wasCustom !== (version === 'custom')) _redrawBatchList();   // 🆕 2026-11-04 进出定制版档时每行的到期日跟着切换
             document.querySelectorAll('#batch-version-selector .month-btn').forEach(b => b.classList.remove('selected'));
             el.classList.add('selected');
             updateBatchTotal();
@@ -1045,6 +1099,40 @@
             document.querySelectorAll('#month-selector .month-btn').forEach(b => b.classList.remove('selected'));
             el.classList.add('selected');
             document.getElementById('renew-next-btn').disabled = !(renewState.selectedVersion && renewState.selectedMonths);
+        }
+
+        // 🆕 2026-11-04 下单前按定制版规则检查目标用户，返回 false = 不下单
+        // 🆕 2026-11-04 普通/高级单且手上没人定制版在期：直接过，不多发请求(列表旧了由服务端兜底)；其余先重拉到期日(页面可能开了很久)，读失败就用手上的
+        async function _customOrderCheck(version, rows, isBatch) {
+            const isCustom = version === 'custom';
+            if (!isCustom && !rows.some(u => customTierLive(u))) return true;
+            let targets = rows;
+            try {
+                const { data } = await sbClient.from('users')
+                    .select('id, username, expiry_date, name_mode_expiry, custom_expiry, custom_visible')
+                    .in('id', rows.map(u => u.id));
+                const fresh = new Map((data || []).map(u => [String(u.id), u]));
+                targets = rows.map(u => fresh.get(String(u.id)) || u);
+            } catch (e) {
+                console.warn('[续费检查] 读取到期日失败:', e.message);
+            }
+            const today = usWestToday();
+            const names = (list) => list.slice(0, 5).map(u => u.username).join('、') + (list.length > 5 ? ' 等' : '');
+            if (!isCustom) {
+                const hit = targets.filter(u => customTierLive(u, today));
+                if (!hit.length) return true;
+                await showCustomAlert((_customTierOn() ? '该用户定制版在期，只能续定制版' : '该用户定制版在期，请联系主管理续费') + (isBatch ? `：${names(hit)}（共 ${hit.length} 人）` : ''));   // 🆕 2026-11-04 没有定制版价格的次级续不了，指向主管理
+                return false;
+            }
+            // 🆕 2026-11-04 主管理关掉了定制版、到期日还没过的用户不能靠下单重新打开，服务端也会拒绝，这里先说清楚
+            const hiddenLive = targets.filter(u => u.custom_visible !== true && u.custom_expiry && String(u.custom_expiry).slice(0, 10) >= today);
+            if (hiddenLive.length) {
+                await showCustomAlert('该用户的定制版已被主管理关闭，请联系主管理' + (isBatch ? `：${names(hiddenLive)}（共 ${hiddenLive.length} 人）` : ''));
+                return false;
+            }
+            const overLive = targets.filter(u => !customTierLive(u, today) && ((u.expiry_date && String(u.expiry_date).slice(0, 10) >= today) || (u.name_mode_expiry && String(u.name_mode_expiry).slice(0, 10) >= today)));
+            if (!overLive.length) return true;
+            return await showCustomConfirm((isBatch ? `所选用户中有 ${overLive.length} 人（${names(overLive)}）` : '该用户') + '的普通 / 高级会员还在期：定制版生效后，这段时间只能用 Spokeo 与 USA People Search，普通 / 高级的到期日照常走。\n确定继续下单吗？');
         }
 
         async function goToPayStep() {
@@ -1064,6 +1152,7 @@
             renewState.payAddress = cfg.pay_usdt_addr;
 
             if (!renewState.unitPrice || renewState.unitPrice <= 0) return showCustomAlert('请先选择续费档位。');
+            if (!(await _customOrderCheck(renewState.selectedVersion, [renewState.customRow], false))) return;   // 🆕 2026-11-04
             const base = months * renewState.unitPrice;
             const uniqueAmount = _uniqueAmount(base);
             renewState.expectedAmount = uniqueAmount;
@@ -1075,7 +1164,8 @@
                 amount_usdt: uniqueAmount,
                 to_address: renewState.payAddress,
                 status: 'pending',
-                grant_name_mode: renewState.selectedVersion !== 'basic',   // 高级会员①/② → 结算时开通高级模式；普通会员 → 只延长账号到期
+                grant_name_mode: renewState.selectedVersion !== 'basic' && renewState.selectedVersion !== 'custom',   // 高级会员①/② → 结算时开通高级模式；普通会员 → 只延长账号到期
+                grant_custom: renewState.selectedVersion === 'custom',   // 🆕 2026-11-04 定制版单：结算只延长定制版到期(和 grant_name_mode 不能同时为 true)
                 operator_id: (currentUser && currentUser.id) || null,
                 operator_name: (currentUser && currentUser.username) || null
             }).select().single();
@@ -1158,7 +1248,7 @@
                 <div style="background:#1a1a21;border:1px solid #26a17b;border-radius:16px;padding:40px;text-align:center;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
                     <div style="font-size:60px;margin-bottom:15px;">✅</div>
                     <div style="font-size:20px;font-weight:bold;color:#26a17b;margin-bottom:12px;">付款成功！</div>
-                    <div style="font-size:14px;color:#ccc;margin-bottom:6px;">已为 <span style="color:#fff;font-weight:bold;">${escapeHtml(renewState.username)}</span> 续期 <span style="color:#26a17b;font-weight:bold;">${months} 个月${renewState.selectedVersion === 'basic' ? '（普通会员）' : '（高级会员）'}</span></div>
+                    <div style="font-size:14px;color:#ccc;margin-bottom:6px;">已为 <span style="color:#fff;font-weight:bold;">${escapeHtml(renewState.username)}</span> 续期 <span style="color:#26a17b;font-weight:bold;">${months} 个月${renewState.selectedVersion === 'custom' ? '（高山集团定制版）' : renewState.selectedVersion === 'basic' ? '（普通会员）' : '（高级会员）'}</span></div>
                     <div style="font-size:13px;color:#888;margin-bottom:25px;">新到期日：<span style="color:#fdcb6e;">${newExpiryDisplay}</span></div>
                     <button onclick="document.getElementById('success-overlay').remove();closeRenewModal();loadAdminData();" style="background:#26a17b;color:#fff;border:none;border-radius:10px;padding:12px 40px;font-size:15px;font-weight:bold;cursor:pointer;">确 定</button>
                 </div>
@@ -1189,7 +1279,7 @@
             if (allowedIds.length === 0) return showCustomAlert("暂无可操作的用户");
 
             const { data: users } = await sbClient.from('users')
-                .select('id, username, remark, expiry_date')
+                .select('id, username, remark, expiry_date, name_mode_expiry, custom_expiry, custom_visible')
                 .in('id', allowedIds)
                 .order('id');
 
@@ -1208,14 +1298,24 @@
 
         // 批量续费：价格档归位(显示最新单价·清空已选档位·保留已勾选的用户月数)
         function _resetBatchVersion() {
+            const wasCustom = batchRenewState.selectedVersion === 'custom';   // 🆕 2026-11-04
             batchRenewState.selectedVersion = null;
             batchRenewState.unitPrice = null;
             const _bva = document.getElementById('batch-ver-price-advanced'); if (_bva) _bva.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_advanced);
             const _bvn = document.getElementById('batch-ver-price-normal'); if (_bvn) _bvn.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_normal);
             const _bvb = document.getElementById('batch-ver-price-basic'); if (_bvb) _bvb.textContent = _fmtUnitPrice(currentUser && currentUser.sub_price_basic);
+            const _bvc = document.getElementById('batch-ver-price-custom'); if (_bvc) _bvc.textContent = _fmtUnitPrice(_customTierOn() && currentUser.sub_price_custom);
             applyBasicTierVisibility();
             document.querySelectorAll('#batch-version-selector .month-btn').forEach(b => b.classList.remove('selected'));
+            if (wasCustom) _redrawBatchList();   // 🆕 2026-11-04 列表正显示定制版到期时恢复
             updateBatchTotal();
+        }
+
+        // 🆕 2026-11-04 重画批量列表，勾选和滚动位置不变
+        function _redrawBatchList() {
+            const box = document.getElementById('batch-user-list'), top = box.scrollTop;
+            renderBatchUserList();
+            box.scrollTop = top;
         }
 
         function closeBatchRenewModal() {
@@ -1234,13 +1334,14 @@
                 
                 const currentMonths = batchRenewState.selections[u.id] || 0;
                 const expiryText = u.expiry_date ? (()=>{ const d=new Date(u.expiry_date); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; })() : '未设置';
+                const showCustom = batchRenewState.selectedVersion === 'custom';   // 🆕 2026-11-04 选定制版档时显示定制版到期
                 
                 const div = document.createElement('div');
                 div.className = 'batch-user-item';
                 div.innerHTML = `
                     <div class="batch-user-info">
                         <span style="font-weight:bold; color:#fff; font-size:14px;">${escapeHtml(u.username)} <span style="color:#888; font-size:12px; font-weight:normal;">${u.remark ? `(${escapeHtml(u.remark)})` : ''}</span></span>
-                        <span style="font-size:12px; color:#fdcb6e;">当前到期: ${expiryText}</span>
+                        <span style="font-size:12px; color:#fdcb6e;">${showCustom ? `定制版到期: ${_customExpiryHtml(u)}` : `当前到期: ${expiryText}`}</span>${(!showCustom && _hasCustomData(u)) ? `<span style="font-size:12px; color:${customTierLive(u) ? '#00cec9' : '#636e72'};">定制版到期: ${_customExpiryHtml(u)}</span>` : ''}
                     </div>
                     <div>
                         <select class="batch-month-select" onchange="updateBatchSelection(${u.id}, this.value)">
@@ -1299,6 +1400,7 @@
 
             batchRenewState.payAddress = cfg.pay_usdt_addr;
             if (!batchRenewState.unitPrice || batchRenewState.unitPrice <= 0) return showCustomAlert('请先选择续费档位。');
+            if (!(await _customOrderCheck(batchRenewState.selectedVersion, batchRenewState.users.filter(u => batchRenewState.selections[u.id]), true))) return;   // 🆕 2026-11-04
             const base = totalMonths * batchRenewState.unitPrice;
             const uniqueAmount = _uniqueAmount(base);
             batchRenewState.expectedAmount = uniqueAmount;
@@ -1316,7 +1418,8 @@
                 amount_usdt: uniqueAmount,
                 to_address: batchRenewState.payAddress,
                 status: 'pending',
-                grant_name_mode: batchRenewState.selectedVersion !== 'basic',   // 高级会员①/② → 整批开通高级模式；普通会员 → 整批只延长账号到期
+                grant_name_mode: batchRenewState.selectedVersion !== 'basic' && batchRenewState.selectedVersion !== 'custom',   // 高级会员①/② → 整批开通高级模式；普通会员 → 整批只延长账号到期
+                grant_custom: batchRenewState.selectedVersion === 'custom',   // 🆕 2026-11-04 定制版单：整批只延长定制版到期(和 grant_name_mode 不能同时为 true)
                 batch_items: batchItems,
                 operator_id: (currentUser && currentUser.id) || null,
                 operator_name: (currentUser && currentUser.username) || null
@@ -1398,7 +1501,7 @@
                 <div style="background:#1a1a21;border:1px solid #26a17b;border-radius:16px;padding:40px;text-align:center;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
                     <div style="font-size:60px;margin-bottom:15px;">✅</div>
                     <div style="font-size:20px;font-weight:bold;color:#26a17b;margin-bottom:12px;">批量付款成功！</div>
-                    <div style="font-size:14px;color:#ccc;margin-bottom:25px;">已成功为选定的账户分配续费时间。</div>
+                    <div style="font-size:14px;color:#ccc;margin-bottom:25px;">已成功为选定的账户分配续费时间${batchRenewState.selectedVersion === 'custom' ? '（高山集团定制版）' : ''}。</div>
                     <button onclick="document.getElementById('success-overlay').remove();closeBatchRenewModal();loadAdminData();" style="background:#26a17b;color:#fff;border:none;border-radius:10px;padding:12px 40px;font-size:15px;font-weight:bold;cursor:pointer;">确 定</button>
                 </div>
             `;
