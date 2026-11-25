@@ -132,14 +132,24 @@
         .admin-table tr:hover { background: #1f1f2e; }
         .history-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
         .history-toolbar h2 { margin: 0; font-size: 18px; }
+        .history-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+        .history-controls label { color: #b2bec3; font-size: 13px; }
+        .history-controls input, .history-controls select { width: auto; height: 36px; padding: 0 10px; color-scheme: dark; }
+        .history-controls button:disabled { opacity: .45; cursor: default; transform: none; }
+        .history-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 14px 0; }
+        .history-stats > div { padding: 12px 15px; border: 1px solid #24534a; border-radius: 8px; background: #142421; }
+        .history-stats dt { font-size: 13px; color: #b2bec3; }
+        .history-stats dd { margin: 4px 0 0; color: #42d6a5; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .history-stats > div:last-child { border-color: #53462e; background: #25211b; }
+        .history-stats > div:last-child dd { color: #fdcb6e; }
         .history-table-wrap { overflow-x: auto; }
         .history-table th, .history-table td { white-space: nowrap; }
         .history-table td { user-select: text; }
         .history-table summary { cursor: pointer; }
         .history-table ul { margin: 6px 0 0; padding-left: 18px; }
         .history-table a { color: #2ee6a6; }
-        #order-history-status { color: #b2bec3; font-size: 13px; }
-        #order-history-status:empty { display: none; }
+        #order-history-status, #order-summary-status { color: #b2bec3; font-size: 13px; }
+        #order-history-status:empty, #order-summary-status:empty { display: none; }
         #order-history-more[hidden] { display: none; }
         button.nav-item { background: transparent; border: 0; border-left: 3px solid transparent; font-family: inherit; }
         .status-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
@@ -480,6 +490,25 @@
                         <h2>我的续费订单</h2>
                         <button type="button" class="btn btn-normal" onclick="loadMyOrderHistory()">刷新订单</button>
                     </div>
+                    <div class="history-controls">
+                        <label for="order-month">下单月份（北京时间）</label>
+                        <button type="button" class="btn btn-normal" id="order-month-prev" onclick="changeOrderMonth(-1)">◀ 上一月</button>
+                        <input type="month" id="order-month" class="form-input" min="0001-01" onchange="loadMyOrderHistory()">
+                        <button type="button" class="btn btn-normal" id="order-month-next" onclick="changeOrderMonth(1)">下一月 ▶</button>
+                        <button type="button" class="btn btn-normal" id="order-month-current" onclick="changeOrderMonth(0)">本月</button>
+                    </div>
+                    <dl class="history-stats" aria-label="所选月本人续费汇总">
+                        <div><dt>已支付订单数</dt><dd id="stat-paid-count">—</dd></div>
+                        <div><dt>已支付总额（USDT）</dt><dd id="stat-paid-amount">—</dd></div>
+                        <div><dt>待支付订单数</dt><dd id="stat-pending-count">—</dd></div>
+                    </dl>
+                    <p id="order-summary-status" role="status"></p>
+                    <div class="history-controls">
+                        <input type="search" class="form-input" id="order-search" aria-label="搜索单笔账号或批量单名称" placeholder="搜索单笔账号或批量单名称" oninput="searchOrderHistory()">
+                        <select class="form-select" id="order-status-filter" aria-label="订单状态" onchange="loadMyOrderHistory(false, false)">
+                            <option value="">全部状态</option><option value="paid">已支付</option><option value="pending">待支付</option>
+                        </select>
+                    </div>
                     <div class="history-table-wrap">
                         <table class="admin-table history-table">
                             <thead><tr>
@@ -490,7 +519,7 @@
                         </table>
                     </div>
                     <p id="order-history-status" role="status"></p>
-                    <button type="button" class="btn btn-normal" id="order-history-more" hidden onclick="loadMyOrderHistory(true)">加载更早订单</button>
+                    <button type="button" class="btn btn-normal" id="order-history-more" hidden onclick="loadMyOrderHistory(true)">加载更多订单</button>
                 </div>
             </div>
         </div>
@@ -905,9 +934,12 @@
 
         const orderPageSize = 30;
         let orderRequestId = 0;
+        let summaryRequestId = 0;
+        let orderSearchTimer;
         let oldestOrderId = null;
 
-        function clearOrderHistory() {
+        function resetOrderRows() {
+            clearTimeout(orderSearchTimer);
             orderRequestId++;
             oldestOrderId = null;
             document.getElementById('order-history-list').replaceChildren();
@@ -915,10 +947,72 @@
             document.getElementById('order-history-more').hidden = true;
         }
 
+        function clearOrderHistory() {
+            resetOrderRows();
+            summaryRequestId++;
+            for (const id of ['stat-paid-count', 'stat-paid-amount', 'stat-pending-count']) {
+                document.getElementById(id).textContent = '—';
+            }
+            document.getElementById('order-summary-status').textContent = '';
+        }
+
+        function searchOrderHistory() {
+            resetOrderRows();
+            orderSearchTimer = setTimeout(() => loadMyOrderHistory(false, false), 250);
+        }
+
+        function offsetOrderMonth(month, delta) {
+            const date = new Date(month + '-01T00:00:00Z');
+            date.setUTCMonth(date.getUTCMonth() + delta);
+            return date.toISOString().slice(0, 7);
+        }
+
+        function getOrderMonthRange() {
+            const input = document.getElementById('order-month');
+            const today = new Date(Date.now() + 8 * 3600000);
+            input.max = today.toISOString().slice(0, 7);
+            if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.value) || input.value > input.max || input.value < input.min) {
+                input.value = input.max;
+            }
+            const month = input.value;
+            document.getElementById('order-month-next').disabled = month === input.max;
+            document.getElementById('order-month-prev').disabled = month === input.min;
+            return {
+                month,
+                start: new Date(month + '-01T00:00:00+08:00').toISOString(),
+                end: new Date(offsetOrderMonth(month, 1) + '-01T00:00:00+08:00').toISOString()
+            };
+        }
+
+        function changeOrderMonth(delta) {
+            const input = document.getElementById('order-month');
+            const { month } = getOrderMonthRange();
+            input.value = delta === 0 ? input.max : offsetOrderMonth(month, delta);
+            loadMyOrderHistory();
+        }
+
+        async function loadOrderSummary(month, operatorId, requestId) {
+            const status = document.getElementById('order-summary-status');
+            status.textContent = '正在统计…';
+            try {
+                const { data, error } = await sbClient.rpc('get_my_renewal_month_summary', { p_month: month + '-01' }).single();
+                if (requestId !== summaryRequestId || currentUser?.id !== operatorId) return;
+                if (error) throw error;
+                document.getElementById('stat-paid-count').textContent = data.paid_count;
+                document.getElementById('stat-paid-amount').textContent = Number(data.paid_amount).toFixed(3);
+                document.getElementById('stat-pending-count').textContent = data.pending_count;
+                status.textContent = '';
+            } catch (error) {
+                if (requestId === summaryRequestId && currentUser?.id === operatorId) {
+                    status.textContent = '月度汇总加载失败，请刷新订单重试。';
+                }
+            }
+        }
+
         function formatOrderTime(value) {
             const date = new Date(value);
             return value && !Number.isNaN(date.getTime())
-                ? date.toLocaleString('zh-CN', { hour12: false })
+                ? date.toLocaleString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })
                 : '—';
         }
 
@@ -967,21 +1061,32 @@
             return tr;
         }
 
-        async function loadMyOrderHistory(append = false) {
-            if (!append) clearOrderHistory();
+        async function loadMyOrderHistory(append = false, refreshSummary = true) {
+            if (!append) {
+                if (refreshSummary) clearOrderHistory();
+                else resetOrderRows();
+            }
             const operatorId = currentUser?.id;
-            if (!currentUser?.is_admin || operatorId == null || (append && oldestOrderId == null)) return;
-            const requestId = ++orderRequestId;
-            const status = document.getElementById('order-history-status');
             const more = document.getElementById('order-history-more');
+            if (!currentUser?.is_admin || operatorId == null || (append && (oldestOrderId == null || more.disabled || more.hidden))) return;
+            const { month, start, end } = getOrderMonthRange();
+            if (!append && refreshSummary) loadOrderSummary(month, operatorId, summaryRequestId);
+            const requestId = orderRequestId;
+            const status = document.getElementById('order-history-status');
+            const name = document.getElementById('order-search').value.trim();
+            const paymentStatus = document.getElementById('order-status-filter').value;
             more.disabled = true;
             status.textContent = '正在加载订单…';
             try {
                 let query = sbClient.from('renewal_orders')
                     .select('id,username,batch_items,months,grant_name_mode,grant_custom,amount_usdt,status,created_at,paid_at,tx_hash')
                     .eq('operator_id', operatorId)
+                    .gte('created_at', start)
+                    .lt('created_at', end)
                     .order('id', { ascending: false })
                     .limit(orderPageSize + 1);
+                if (name) query = query.ilike('username', '%' + name.replace(/[\\%_]/g, '\\$&') + '%');
+                if (paymentStatus) query = query.eq('status', paymentStatus);
                 if (append) query = query.lt('id', oldestOrderId);
                 const { data, error } = await query;
                 if (requestId !== orderRequestId || currentUser?.id !== operatorId) return;
@@ -991,7 +1096,7 @@
                 tbody.append(...rows.map(renderOrderRow));
                 if (rows.length) oldestOrderId = rows[rows.length - 1].id;
                 more.hidden = data.length <= orderPageSize;
-                status.textContent = tbody.rows.length ? '' : '暂无本人发起的续费订单';
+                status.textContent = tbody.rows.length ? '' : (name || paymentStatus ? '该月没有符合筛选条件的订单' : '该月暂无本人发起的续费订单');
             } catch (error) {
                 if (requestId === orderRequestId && currentUser?.id === operatorId) {
                     status.textContent = '订单加载失败，请' + (append ? '重新加载更早订单。' : '刷新重试。');
