@@ -130,6 +130,18 @@
         .admin-table th, .admin-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #2a2a31; }
         .admin-table th { color: #888; font-size: 12px; text-transform: uppercase; }
         .admin-table tr:hover { background: #1f1f2e; }
+        .history-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+        .history-toolbar h2 { margin: 0; font-size: 18px; }
+        .history-table-wrap { overflow-x: auto; }
+        .history-table th, .history-table td { white-space: nowrap; }
+        .history-table td { user-select: text; }
+        .history-table summary { cursor: pointer; }
+        .history-table ul { margin: 6px 0 0; padding-left: 18px; }
+        .history-table a { color: #2ee6a6; }
+        #order-history-status { color: #b2bec3; font-size: 13px; }
+        #order-history-status:empty { display: none; }
+        #order-history-more[hidden] { display: none; }
+        button.nav-item { background: transparent; border: 0; border-left: 3px solid transparent; font-family: inherit; }
         .status-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
         .status-ok { background: rgba(0, 184, 148, 0.2); color: #00b894; }
         .status-ban { background: rgba(214, 48, 49, 0.2); color: #d63031; }
@@ -423,6 +435,9 @@
         <div class="nav-item active" onclick="switchAdminTab('admin-tab-users', this)">
             <span class="material-icons">people</span> 用户管理
         </div>
+        <button type="button" class="nav-item" onclick="switchAdminTab('admin-tab-orders', this)">
+            <span class="material-icons" aria-hidden="true">receipt_long</span> 我的续费订单
+        </button>
         <div class="nav-item" style="margin-top: auto;" onclick="logout()">
             <span class="material-icons">logout</span> 退出登录
         </div>
@@ -459,6 +474,23 @@
                             <tbody id="admin-user-list"></tbody>
                         </table>
                     </div>
+                </div>
+                <div id="admin-tab-orders" class="setting-panel">
+                    <div class="history-toolbar">
+                        <h2>我的续费订单</h2>
+                        <button type="button" class="btn btn-normal" onclick="loadMyOrderHistory()">刷新订单</button>
+                    </div>
+                    <div class="history-table-wrap">
+                        <table class="admin-table history-table">
+                            <thead><tr>
+                                <th>订单号</th><th>续费账号</th><th>会员类型</th><th>月数</th>
+                                <th>金额 (USDT)</th><th>状态</th><th>下单时间</th><th>支付时间</th><th>交易哈希</th>
+                            </tr></thead>
+                            <tbody id="order-history-list"></tbody>
+                        </table>
+                    </div>
+                    <p id="order-history-status" role="status"></p>
+                    <button type="button" class="btn btn-normal" id="order-history-more" hidden onclick="loadMyOrderHistory(true)">加载更早订单</button>
                 </div>
             </div>
         </div>
@@ -499,6 +531,12 @@
                         sbClient.realtime.disconnect();
                     }
                     console.log("[Admin] Supabase 客户端初始化成功（Realtime 已禁用）");
+                    sbClient.auth.onAuthStateChange((_event, session) => {
+                        if (currentUser && currentUser.auth_id !== session?.user.id) {
+                            clearOrderHistory();
+                            window.location.reload();
+                        }
+                    });
                     startAdminPanel();
                 } catch (e) {
                     alert("Supabase 初始化失败，请刷新页面。");
@@ -620,10 +658,16 @@
             }
         }
 
-        function logout() {
+        async function logout() {
+            clearOrderHistory();
+            currentUser = null;
             localStorage.removeItem('adminUser');
+            document.getElementById('login-overlay').style.display = 'flex';
+            const { error } = await sbClient.auth.signOut({ scope: 'local' });
+            if (error) return showCustomAlert("退出登录失败，请重试。");
             alert("已退出登录。");
             window.close();
+            window.location.reload();
         }
 
         // 🛠️ 万能自定义弹窗工具
@@ -856,6 +900,105 @@
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId.replace('page-admin #', '')).classList.add('active');
             btnElement.classList.add('active');
+            if (tabId === 'admin-tab-orders') loadMyOrderHistory();
+        }
+
+        const orderPageSize = 30;
+        let orderRequestId = 0;
+        let oldestOrderId = null;
+
+        function clearOrderHistory() {
+            orderRequestId++;
+            oldestOrderId = null;
+            document.getElementById('order-history-list').replaceChildren();
+            document.getElementById('order-history-status').textContent = '';
+            document.getElementById('order-history-more').hidden = true;
+        }
+
+        function formatOrderTime(value) {
+            const date = new Date(value);
+            return value && !Number.isNaN(date.getTime())
+                ? date.toLocaleString('zh-CN', { hour12: false })
+                : '—';
+        }
+
+        function renderOrderRow(row) {
+            const tr = document.createElement('tr');
+            tr.insertCell().textContent = '#' + row.id;
+            const account = tr.insertCell();
+            if (Array.isArray(row.batch_items) && row.batch_items.length) {
+                const details = document.createElement('details');
+                const summary = document.createElement('summary');
+                summary.textContent = '批量续费（' + row.batch_items.length + ' 人）';
+                const list = document.createElement('ul');
+                for (const item of row.batch_items) {
+                    const entry = document.createElement('li');
+                    const name = _listedUsers.get(String(item?.user_id))?.username;
+                    entry.textContent = (name || '账号 #' + (item?.user_id ?? '—')) + ' · ' + (item?.months ?? '—') + ' 个月';
+                    list.append(entry);
+                }
+                details.append(summary, list);
+                account.append(details);
+            } else {
+                account.textContent = row.username || '—';
+            }
+            tr.insertCell().textContent = row.grant_custom ? '定制版'
+                : row.grant_name_mode === true ? '高级会员' : row.grant_name_mode === false ? '普通会员' : '—';
+            tr.insertCell().textContent = row.months ?? '—';
+            tr.insertCell().textContent = row.amount_usdt == null ? '—' : Number(row.amount_usdt).toFixed(3);
+            const badge = document.createElement('span');
+            badge.className = 'status-badge ' + (row.status === 'paid' ? 'status-ok' : 'status-ban');
+            badge.textContent = row.status === 'paid' ? '已支付' : row.status === 'pending' ? '待支付' : (row.status || '未知');
+            tr.insertCell().append(badge);
+            tr.insertCell().textContent = formatOrderTime(row.created_at);
+            tr.insertCell().textContent = formatOrderTime(row.paid_at);
+            const tx = tr.insertCell();
+            if (row.tx_hash) {
+                const link = document.createElement('a');
+                link.href = 'https://tronscan.org/#/transaction/' + encodeURIComponent(row.tx_hash);
+                link.rel = 'noopener noreferrer';
+                link.target = '_blank';
+                link.title = row.tx_hash;
+                link.textContent = row.tx_hash.slice(0, 6) + '…' + row.tx_hash.slice(-6);
+                tx.append(link);
+            } else {
+                tx.textContent = '—';
+            }
+            return tr;
+        }
+
+        async function loadMyOrderHistory(append = false) {
+            if (!append) clearOrderHistory();
+            const operatorId = currentUser?.id;
+            if (!currentUser?.is_admin || operatorId == null || (append && oldestOrderId == null)) return;
+            const requestId = ++orderRequestId;
+            const status = document.getElementById('order-history-status');
+            const more = document.getElementById('order-history-more');
+            more.disabled = true;
+            status.textContent = '正在加载订单…';
+            try {
+                let query = sbClient.from('renewal_orders')
+                    .select('id,username,batch_items,months,grant_name_mode,grant_custom,amount_usdt,status,created_at,paid_at,tx_hash')
+                    .eq('operator_id', operatorId)
+                    .order('id', { ascending: false })
+                    .limit(orderPageSize + 1);
+                if (append) query = query.lt('id', oldestOrderId);
+                const { data, error } = await query;
+                if (requestId !== orderRequestId || currentUser?.id !== operatorId) return;
+                if (error) throw error;
+                const rows = data.slice(0, orderPageSize);
+                const tbody = document.getElementById('order-history-list');
+                tbody.append(...rows.map(renderOrderRow));
+                if (rows.length) oldestOrderId = rows[rows.length - 1].id;
+                more.hidden = data.length <= orderPageSize;
+                status.textContent = tbody.rows.length ? '' : '暂无本人发起的续费订单';
+            } catch (error) {
+                if (requestId === orderRequestId && currentUser?.id === operatorId) {
+                    status.textContent = '订单加载失败，请' + (append ? '重新加载更早订单。' : '刷新重试。');
+                }
+            } finally {
+                if (requestId === orderRequestId) more.disabled = false;
+            }
         }
 
         // ================= 🚀 轮询监听（已完全禁用 Realtime WebSocket） =================
